@@ -10,6 +10,7 @@ import { travelEngine } from './travelEngine';
 import { paymentEngine } from './paymentEngine';
 import { speechService } from './speechService';
 import { DEFAULT_PASSENGER } from '../data/travelDatabase';
+import { contextHarness } from './contextHarness';
 
 export interface AgentContext {
   origin: string;
@@ -115,6 +116,21 @@ export class VoiceAgentOrchestrator {
     this.appendMessage(userMsg);
 
     const lower = text.toLowerCase();
+
+    // Context Harness Security & Credential Leak Guardrail
+    const safety = contextHarness.sanitizeUserUtterance(text);
+    if (!safety.isSafe) {
+      this.appendMessage({
+        id: `sec-${Date.now()}`,
+        role: 'system',
+        text: `🛡️ ${safety.warning}`,
+        timestamp: new Date().toLocaleTimeString(),
+      });
+      const warningSpeech = "For your security, never share your UPI PIN or password over voice. We only use authorized out-of-band payment apps.";
+      if (voiceTrigger) speechService.speak(warningSpeech);
+      this.isProcessing = false;
+      return;
+    }
 
     // 1. SCENARIO 5: Payment Deducted / Ticket Pending Exception Recovery
     if (
