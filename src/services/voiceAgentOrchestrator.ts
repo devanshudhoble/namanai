@@ -7,7 +7,7 @@ import {
   TelemetryMetrics,
   TravelOption,
 } from '../types';
-import { travelEngine } from './travelEngine';
+import { travelEngine, normalizeCityName } from './travelEngine';
 import { paymentEngine } from './paymentEngine';
 import { speechService } from './speechService';
 import { contextHarness } from './contextHarness';
@@ -34,14 +34,15 @@ export interface AgentContext {
   telemetry: TelemetryMetrics;
   waitingForApproval: boolean;
   preferencesAsked: boolean;
+  activeQuestion: 'destination' | 'origin' | 'date' | 'tripType' | 'passengers' | 'mode' | 'preferences' | 'options' | 'approval' | 'name';
 }
 
-const KNOWN_INDIAN_CITIES = [
+const KNOWN_INDIAN_LOCATIONS = [
   // Metros & Tier-2/3 Hubs
-  'nagpur', 'mumbai', 'delhi', 'bengaluru', 'bangalore', 'pune', 'hyderabad', 'chennai',
+  'jodhpur', 'jodpur', 'nagpur', 'mumbai', 'delhi', 'bengaluru', 'bangalore', 'pune', 'hyderabad', 'chennai',
   'kolkata', 'ahmedabad', 'jaipur', 'lucknow', 'chandigarh', 'varanasi', 'bhopal',
   'indore', 'patna', 'surat', 'kochi', 'cochin', 'goa', 'amritsar', 'manali', 'shimla',
-  'dehradun', 'ayodhya', 'shirdi', 'haridwar', 'rishikesh', 'udaipur', 'jodhpur', 'agra',
+  'dehradun', 'ayodhya', 'shirdi', 'haridwar', 'rishikesh', 'udaipur', 'agra',
   'vadodara', 'coimbatore', 'visakhapatnam', 'vizag', 'ranchi', 'raipur', 'guwahati',
   'bhubaneswar', 'wardha', 'amravati', 'solapur', 'nashik', 'latur', 'nanded', 'kolhapur',
   'mysore', 'mysuru', 'mangalore', 'kannur', 'kozhikode', 'thiruvananthapuram', 'trivandrum',
@@ -55,6 +56,84 @@ const KNOWN_INDIAN_CITIES = [
   'nagaland', 'arunachal pradesh', 'ladakh', 'jammu', 'chhattisgarh', 'madhya pradesh', 'uttar pradesh'
 ];
 
+// Context-aware Indian Date Parser using current calendar date
+export function parseIndianDateInput(text: string, referenceDate: Date = new Date()): string | null {
+  const clean = text.trim();
+  const lower = clean.toLowerCase();
+  const currentDay = referenceDate.getDate();
+  const currentMonth = referenceDate.getMonth(); // 0-indexed
+  const currentYear = referenceDate.getFullYear();
+
+  // 1. Relative keywords
+  if (lower === 'today' || lower === 'aaj') {
+    return `Today (${referenceDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
+  }
+  if (lower === 'tomorrow' || lower === 'kal') {
+    const tmrw = new Date(referenceDate);
+    tmrw.setDate(currentDay + 1);
+    return `Tomorrow (${tmrw.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
+  }
+  if (lower === 'day after tomorrow' || lower === 'parso') {
+    const dayAfter = new Date(referenceDate);
+    dayAfter.setDate(currentDay + 2);
+    return `Day After Tomorrow (${dayAfter.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
+  }
+  if (lower === 'weekend' || lower === 'this weekend') {
+    const sat = new Date(referenceDate);
+    const dayOfWeek = referenceDate.getDay();
+    const diff = (6 - dayOfWeek + 7) % 7 || 7;
+    sat.setDate(currentDay + diff);
+    return `This Weekend (${sat.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
+  }
+
+  // 2. Named Weekdays (e.g. "Friday", "Next Friday", "Somwar", "Monday")
+  const weekdaysMap: Record<string, number> = {
+    sunday: 0, itwar: 0, ravivar: 0,
+    monday: 1, somwar: 1,
+    tuesday: 2, mangalwar: 2,
+    wednesday: 3, budhwar: 3,
+    thursday: 4, guruwar: 4, veervar: 4,
+    friday: 5, shukrawar: 5,
+    saturday: 6, shaniwar: 6,
+  };
+  for (const [dayName, targetDayNum] of Object.entries(weekdaysMap)) {
+    if (lower.includes(dayName)) {
+      const isNext = lower.includes('next') || lower.includes('agle') || lower.includes('agla');
+      const target = new Date(referenceDate);
+      let diff = (targetDayNum - referenceDate.getDay() + 7) % 7;
+      if (diff === 0 || isNext) diff += 7;
+      target.setDate(currentDay + diff);
+      return target.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  }
+
+  // 3. User says a pure number or date with suffix like:
+  // "4", "5", "4th", "5th", "4 ko", "5 tarikh", "4 nov", "4/11", "25", "12"
+  const dateNumMatch = clean.match(/(?:^|\b)(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:ko|tarikh|tareekh|nov|november|dec|december|jan|january|feb|mar|apr|may|jun|jul|aug|sep|oct)?)?(?:\b|$)/i);
+  if (dateNumMatch) {
+    const day = parseInt(dateNumMatch[1], 10);
+    if (day >= 1 && day <= 31) {
+      let targetMonth = currentMonth;
+      let targetYear = currentYear;
+      // If current day is 2nd Nov and user says "4", day >= currentDay -> Nov 4th.
+      // If day < currentDay (e.g. user says 1 when today is 2nd), target next month!
+      if (day < currentDay) {
+        targetMonth = (currentMonth + 1) % 12;
+        if (targetMonth === 0) targetYear += 1;
+      }
+      const targetDate = new Date(targetYear, targetMonth, day);
+      return targetDate.toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric'
+      });
+    }
+  }
+
+  return null;
+}
+
 function extractCityFromText(text: string): { destination?: string; origin?: string } {
   const lower = text.toLowerCase();
   let destination: string | undefined;
@@ -63,43 +142,43 @@ function extractCityFromText(text: string): { destination?: string; origin?: str
   // Pattern: "from X to Y" or "X to Y" or "X se Y"
   const fromToMatch = text.match(/(?:from|se)\s+([A-Za-z]+)\s+(?:to|tak)\s+([A-Za-z]+)/i);
   if (fromToMatch) {
-    origin = capitalize(fromToMatch[1]);
-    destination = capitalize(fromToMatch[2]);
+    origin = normalizeCityName(fromToMatch[1]);
+    destination = normalizeCityName(fromToMatch[2]);
     return { origin, destination };
   }
 
   const directToMatch = text.match(/([A-Za-z]+)\s+(?:to|se)\s+([A-Za-z]+)/i);
-  if (directToMatch && KNOWN_INDIAN_CITIES.includes(directToMatch[1].toLowerCase()) && KNOWN_INDIAN_CITIES.includes(directToMatch[2].toLowerCase())) {
-    origin = capitalize(directToMatch[1]);
-    destination = capitalize(directToMatch[2]);
+  if (directToMatch && KNOWN_INDIAN_LOCATIONS.includes(directToMatch[1].toLowerCase()) && KNOWN_INDIAN_LOCATIONS.includes(directToMatch[2].toLowerCase())) {
+    origin = normalizeCityName(directToMatch[1]);
+    destination = normalizeCityName(directToMatch[2]);
     return { origin, destination };
   }
 
   // Pattern: "to [City]" or "for [City]" or "visit [City]" or "[City] jana hai"
   const toMatch = text.match(/(?:to|for|reach|visit|in)\s+([A-Za-z]+)/i);
   if (toMatch) {
-    destination = capitalize(toMatch[1]);
+    destination = normalizeCityName(toMatch[1]);
   }
 
   const fromMatch = text.match(/(?:from|starting from|leaving from|origin)\s+([A-Za-z]+)/i);
   if (fromMatch) {
-    origin = capitalize(fromMatch[1]);
+    origin = normalizeCityName(fromMatch[1]);
   }
 
   const janaHaiMatch = text.match(/([A-Za-z]+)\s+(?:jana|ghoomne|pahunchna)/i);
   if (janaHaiMatch && !destination) {
-    destination = capitalize(janaHaiMatch[1]);
+    destination = normalizeCityName(janaHaiMatch[1]);
   }
 
   const seMatch = text.match(/([A-Za-z]+)\s+se\b/i);
   if (seMatch && !origin) {
-    origin = capitalize(seMatch[1]);
+    origin = normalizeCityName(seMatch[1]);
   }
 
   // Match known Indian cities directly in text
-  for (const city of KNOWN_INDIAN_CITIES) {
+  for (const city of KNOWN_INDIAN_LOCATIONS) {
     if (lower.includes(city)) {
-      const cap = capitalize(city);
+      const cap = normalizeCityName(city);
       if (!destination && !origin) {
         destination = cap;
       }
@@ -107,11 +186,6 @@ function extractCityFromText(text: string): { destination?: string; origin?: str
   }
 
   return { destination, origin };
-}
-
-function capitalize(s: string): string {
-  if (!s) return '';
-  return s.trim().charAt(0).toUpperCase() + s.trim().slice(1).toLowerCase();
 }
 
 export class VoiceAgentOrchestrator {
@@ -145,6 +219,7 @@ export class VoiceAgentOrchestrator {
       step: 'idle',
       waitingForApproval: false,
       preferencesAsked: false,
+      activeQuestion: 'destination',
       messages: [
         {
           id: 'msg-welcome',
@@ -258,14 +333,15 @@ export class VoiceAgentOrchestrator {
     const nameMatch = text.match(/(?:my name is|name is|i am|for|passenger is|traveler is)\s+([A-Za-z\s]+)/i);
     const words = text.trim().split(/\s+/);
     const isNameAnswer =
-      this.context.waitingForApproval &&
+      (this.context.activeQuestion === 'name' || this.context.waitingForApproval) &&
       !this.context.passengerName &&
-      (nameMatch || (words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'nagpur', '3ac', '2ac', 'sleeper', 'haan', 'theek hai'].includes(lower)));
+      (nameMatch || (words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'nagpur', 'jodhpur', '3ac', '2ac', 'sleeper', 'haan', 'theek hai', '4', '5'].includes(lower)));
 
     if (isNameAnswer) {
       const capturedName = (nameMatch ? nameMatch[1] : text).trim();
       if (capturedName.length >= 2) {
         this.context.passengerName = capturedName;
+        this.context.activeQuestion = 'approval';
         await this.handleExecuteSeatLockAndUpiPush(capturedName, startTime, voiceTrigger);
         this.isProcessing = false;
         return;
@@ -287,6 +363,7 @@ export class VoiceAgentOrchestrator {
         lower.includes('okay')
       ) {
         if (!this.context.passengerName) {
+          this.context.activeQuestion = 'name';
           const resp = "Great! What is the primary passenger's full name for the ticket?";
           this.appendMessage({
             id: `agent-${Date.now()}`,
@@ -305,6 +382,7 @@ export class VoiceAgentOrchestrator {
         return;
       } else if (lower.includes('no') || lower.includes('cancel') || lower.includes('wait') || lower.includes('nahi')) {
         this.context.waitingForApproval = false;
+        this.context.activeQuestion = 'options';
         const resp = "No problem! We haven't booked anything. Would you like to explore other timings, modes, or change the dates?";
         this.appendMessage({
           id: `agent-${Date.now()}`,
@@ -319,7 +397,7 @@ export class VoiceAgentOrchestrator {
       }
     }
 
-    // NATURAL STEP-BY-STEP CONVERSATIONAL ENGINE
+    // STEPWISE CONVERSATION ENGINE
     await this.processStepwiseConversation(text, startTime, voiceTrigger);
     this.isProcessing = false;
   }
@@ -328,7 +406,7 @@ export class VoiceAgentOrchestrator {
   private async processStepwiseConversation(text: string, startTime: number, voiceTrigger: boolean) {
     const lower = text.toLowerCase();
 
-    // 1. EXTRACT SLOTS FROM USER UTTERANCE
+    // 1. EXTRACT DESTINATION & ORIGIN
     const cityExtracted = extractCityFromText(text);
 
     // Mid-conversation Destination Change
@@ -346,68 +424,48 @@ export class VoiceAgentOrchestrator {
       this.context.origin = cityExtracted.origin;
     }
 
-    // If destination was unknown and user just uttered a single word like "nagpur"
+    // If destination is still unknown and user uttered a word
     if (!this.context.destination) {
       const trimmed = text.trim();
       const singleWord = trimmed.split(/\s+/)[0];
-      if (singleWord.length >= 3 && !['yes', 'no', 'hello', 'hi', 'train', 'bus', 'flight'].includes(singleWord.toLowerCase())) {
-        this.context.destination = capitalize(singleWord);
+      if (singleWord.length >= 3 && !['yes', 'no', 'hello', 'hi', 'train', 'bus', 'flight', '4', '5'].includes(singleWord.toLowerCase())) {
+        this.context.destination = normalizeCityName(singleWord);
       }
     }
 
-    // Extract Travel Date
-    if (
-      lower.includes('tomorrow') ||
-      lower.includes('kal') ||
-      lower.includes('next friday') ||
-      lower.includes('friday') ||
-      lower.includes('saturday') ||
-      lower.includes('sunday') ||
-      lower.includes('monday') ||
-      lower.includes('tuesday') ||
-      lower.includes('wednesday') ||
-      lower.includes('thursday') ||
-      lower.includes('next week') ||
-      lower.includes('weekend') ||
-      lower.includes('nov') ||
-      lower.includes('dec')
-    ) {
-      if (lower.includes('tomorrow') || lower.includes('kal')) {
-        this.context.date = 'Tomorrow';
-      } else if (lower.includes('friday')) {
-        this.context.date = 'Next Friday';
-      } else if (lower.includes('monday')) {
-        this.context.date = 'Next Monday';
-      } else if (lower.includes('weekend')) {
-        this.context.date = 'This Weekend';
-      } else {
-        this.context.date = text.trim();
-      }
+    // 2. CONTEXT-AWARE DATE PARSER (Fix for "4", "5", "tomorrow", etc.)
+    // If the active question was "date" OR if we have destination and need date:
+    const parsedDate = parseIndianDateInput(text);
+    if (parsedDate && (this.context.activeQuestion === 'date' || !this.context.date)) {
+      this.context.date = parsedDate;
     }
 
-    // Extract Trip Type (One-way vs Return)
+    // 3. TRIP TYPE EXTRACTION (One-way vs Return)
     if (lower.includes('one way') || lower.includes('one-way') || lower.includes('single') || lower.includes('sirf jana') || lower.includes('oneway')) {
       this.context.tripType = 'one-way';
     } else if (lower.includes('return') || lower.includes('round trip') || lower.includes('both ways') || lower.includes('roundtrip') || lower.includes('wapas')) {
       this.context.tripType = 'return';
     }
 
-    // Extract Number of Travellers
-    const numMatch = text.match(/(\d+)\s*(?:people|persons|travellers|travelers|passengers|seats|tickets|log|adults)?/i);
-    if (lower.includes('just me') || lower.includes('solo') || lower.includes('alone') || lower.includes('single') || lower.includes('ek log') || lower.includes('1')) {
-      this.context.passengersCount = 1;
-    } else if (lower.includes('two') || lower.includes('do log') || lower.includes('couple') || lower.includes('2')) {
-      this.context.passengersCount = 2;
-    } else if (lower.includes('three') || lower.includes('teen log') || lower.includes('3')) {
-      this.context.passengersCount = 3;
-    } else if (lower.includes('four') || lower.includes('char log') || lower.includes('4')) {
-      this.context.passengersCount = 4;
-    } else if (numMatch) {
-      const parsed = parseInt(numMatch[1], 10);
-      if (parsed > 0) this.context.passengersCount = parsed;
+    // 4. NUMBER OF TRAVELLERS EXTRACTION
+    // Only parse numbers as passenger count if we are NOT at the date step!
+    if (this.context.date || this.context.activeQuestion === 'passengers') {
+      const numMatch = text.match(/(\d+)\s*(?:people|persons|travellers|travelers|passengers|seats|tickets|log|adults)?/i);
+      if (lower.includes('just me') || lower.includes('solo') || lower.includes('alone') || lower.includes('single') || lower.includes('ek log') || lower.trim() === '1') {
+        this.context.passengersCount = 1;
+      } else if (lower.includes('two') || lower.includes('do log') || lower.includes('couple') || lower.trim() === '2') {
+        this.context.passengersCount = 2;
+      } else if (lower.includes('three') || lower.includes('teen log') || lower.trim() === '3') {
+        this.context.passengersCount = 3;
+      } else if (lower.includes('four') || lower.includes('char log') || (lower.trim() === '4' && this.context.activeQuestion === 'passengers')) {
+        this.context.passengersCount = 4;
+      } else if (numMatch && this.context.activeQuestion === 'passengers') {
+        const parsed = parseInt(numMatch[1], 10);
+        if (parsed > 0) this.context.passengersCount = parsed;
+      }
     }
 
-    // Extract Mode Preference
+    // 5. MODE PREFERENCE EXTRACTION
     if (lower.includes('flight') || lower.includes('plane') || lower.includes('hawai') || lower.includes('fly')) {
       this.context.modePreference = 'flight';
     } else if (lower.includes('train') || lower.includes('railway') || lower.includes('irctc')) {
@@ -420,7 +478,7 @@ export class VoiceAgentOrchestrator {
       this.context.modePreference = 'all';
     }
 
-    // Extract Class Preferences
+    // 6. CLASS PREFERENCES EXTRACTION
     if (lower.includes('3ac') || lower.includes('3 ac') || lower.includes('third ac')) {
       this.context.selectedClass = '3AC';
       this.context.modePreference = 'train';
@@ -432,9 +490,8 @@ export class VoiceAgentOrchestrator {
       this.context.modePreference = 'train';
     }
 
-    // Check Interactive Questions if Options are already presented
+    // 7. CHECK INTERACTIVE QUESTIONS IF OPTIONS ARE PRESENTED
     if (this.context.options.length > 0) {
-      // 1. Cheaper query
       if (lower.includes('cheaper') || lower.includes('sasta') || lower.includes('budget') || lower.includes('lowest price')) {
         const cheapest = [...this.context.options].sort((a, b) => a.price - b.price)[0];
         const resp = `The most affordable option is the ${cheapest.provider} ${cheapest.serviceNumber} at ₹${cheapest.price} (${cheapest.recommendationTag}). Would you like to proceed with this, or check flights?`;
@@ -443,25 +500,22 @@ export class VoiceAgentOrchestrator {
         return;
       }
 
-      // 2. Morning flight query
       if (lower.includes('morning') || lower.includes('subah')) {
         const morningFlight = this.context.options.find((o) => o.mode === 'flight' && o.departureTime.includes('AM')) || this.context.options[0];
         this.context.selectedOption = morningFlight;
-        const resp = `The morning IndiGo flight departs at 06:20 AM and arrives at 08:05 AM for ₹${morningFlight.price}. Includes 15 kg check-in baggage. Should I select this option?`;
+        const resp = `The morning IndiGo flight departs at 06:20 AM and arrives at 08:15 AM for ₹${morningFlight.price}. Includes 15 kg check-in baggage. Should I select this option?`;
         this.speakAndRecord(resp, 'INTERACTIVE_MORNING_QUERY', startTime, voiceTrigger);
         return;
       }
 
-      // 3. Fastest query
       if (lower.includes('fastest') || lower.includes('quickest') || lower.includes('speed')) {
         const fastest = this.context.options.find((o) => o.mode === 'flight') || this.context.options[0];
         this.context.selectedOption = fastest;
-        const resp = `The fastest option is the direct flight with IndiGo at 1h 45m for ₹${fastest.price}. Would you like to select this flight?`;
+        const resp = `The fastest option is the direct flight with IndiGo at 1h 55m for ₹${fastest.price}. Would you like to select this flight?`;
         this.speakAndRecord(resp, 'INTERACTIVE_FASTEST_QUERY', startTime, voiceTrigger);
         return;
       }
 
-      // 4. One day later query
       if (lower.includes('one day later') || lower.includes('next day') || lower.includes('ek din baad')) {
         this.context.date = 'Next Saturday';
         const { options } = await travelEngine.searchTransportOptions(
@@ -478,7 +532,7 @@ export class VoiceAgentOrchestrator {
         return;
       }
 
-      // 5. User selects an option (Flight, Train 3AC, Bus, etc.)
+      // User selects an option (Flight, Train 3AC, Bus, etc.)
       const isSelectingFlight = lower.includes('flight') || lower.includes('indigo') || lower.includes('akasa') || lower.includes('option 1');
       const isSelecting3AC = lower.includes('3ac') || lower.includes('train') || lower.includes('third ac') || lower.includes('option 2');
       const isSelectingBus = lower.includes('bus') || lower.includes('sleeper bus') || lower.includes('option 3');
@@ -496,24 +550,28 @@ export class VoiceAgentOrchestrator {
         this.context.selectedOption = chosen;
         this.context.step = 'option_selected';
         this.context.waitingForApproval = true;
+        this.context.activeQuestion = 'approval';
         this.onStateChange({ ...this.context });
 
         const pCount = this.context.passengersCount || 1;
-        const resp = `Selected ${chosen.provider} (${chosen.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Mumbai'} to ${this.context.destination} on ${this.context.date || 'Next Friday'}. Total fare is ₹${chosen.price}. Would you like me to proceed with this booking?`;
+        const resp = `Selected ${chosen.provider} (${chosen.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Delhi'} to ${this.context.destination} on ${this.context.date || 'your selected date'}. Total fare is ₹${chosen.price}. Would you like me to proceed with this booking?`;
         this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', startTime, voiceTrigger);
         return;
       }
     }
 
-    // 2. ONE QUESTION AT A TIME: ASK THE NEXT MISSING PIECE OF INFORMATION
-    // Step 2: Destination & Origin
+    // 8. ONE QUESTION AT A TIME (Polite, Human, Sequential)
+    // Step 1: Destination
     if (!this.context.destination) {
+      this.context.activeQuestion = 'destination';
       const resp = "Hello! Welcome. Where would you like to travel today?";
       this.speakAndRecord(resp, 'STEP_1_ASK_DESTINATION', startTime, voiceTrigger);
       return;
     }
 
+    // Step 2: Origin
     if (!this.context.origin) {
+      this.context.activeQuestion = 'origin';
       const resp = `Where will you be travelling from to reach ${this.context.destination}?`;
       this.speakAndRecord(resp, 'STEP_2_ASK_ORIGIN', startTime, voiceTrigger);
       return;
@@ -521,6 +579,7 @@ export class VoiceAgentOrchestrator {
 
     // Step 3: Travel Date
     if (!this.context.date) {
+      this.context.activeQuestion = 'date';
       const resp = `When would you like to travel to ${this.context.destination}?`;
       this.speakAndRecord(resp, 'STEP_3_ASK_DATE', startTime, voiceTrigger);
       return;
@@ -528,13 +587,15 @@ export class VoiceAgentOrchestrator {
 
     // Step 4: Return Journey
     if (!this.context.tripType) {
-      const resp = "Would you like a one-way trip or a return journey?";
+      this.context.activeQuestion = 'tripType';
+      const resp = `Got it, ${this.context.date}! Would you like a one-way trip or a return journey?`;
       this.speakAndRecord(resp, 'STEP_4_ASK_RETURN', startTime, voiceTrigger);
       return;
     }
 
     // Step 5: Number of Travellers
     if (!this.context.passengersCount) {
+      this.context.activeQuestion = 'passengers';
       const resp = "How many people will be travelling?";
       this.speakAndRecord(resp, 'STEP_5_ASK_PASSENGER_COUNT', startTime, voiceTrigger);
       return;
@@ -542,6 +603,7 @@ export class VoiceAgentOrchestrator {
 
     // Step 6: Mode of Transport
     if (!this.context.modePreference) {
+      this.context.activeQuestion = 'mode';
       const resp = "How would you prefer to travel? By flight, train or bus?";
       this.speakAndRecord(resp, 'STEP_6_ASK_MODE', startTime, voiceTrigger);
       return;
@@ -550,13 +612,15 @@ export class VoiceAgentOrchestrator {
     // Step 7: Preferences (optional)
     if (!this.context.preferencesAsked) {
       this.context.preferencesAsked = true;
-      const resp = "Do you have any particular preferences, such as a morning journey, direct flight or a specific train/bus class?";
+      this.context.activeQuestion = 'preferences';
+      const resp = "Do you have any particular preferences, such as a morning departure, direct flight or a specific train/bus class?";
       this.speakAndRecord(resp, 'STEP_7_ASK_PREFERENCES', startTime, voiceTrigger);
       return;
     }
 
     // Step 8: FETCH & PRESENT GROUNDED OPTIONS FOR THIS EXACT ROUTE
     this.context.step = 'discovering';
+    this.context.activeQuestion = 'options';
     this.onStateChange({ ...this.context });
 
     const pCount = this.context.passengersCount || 1;
@@ -590,7 +654,7 @@ export class VoiceAgentOrchestrator {
           mode: this.context.modePreference,
           passengers: pCount,
         },
-        resultSummary: `Found ${options.length} verified live options across India`,
+        resultSummary: `Found ${options.length} verified options for ${this.context.origin} ➔ ${this.context.destination}`,
         durationMs: searchLatencyMs,
       }
     );
@@ -715,10 +779,11 @@ export class VoiceAgentOrchestrator {
     this.context.selectedOption = opt;
     this.context.step = 'option_selected';
     this.context.waitingForApproval = true;
+    this.context.activeQuestion = 'approval';
     this.onStateChange({ ...this.context });
 
     const pCount = this.context.passengersCount || 1;
-    const resp = `Selected ${opt.provider} (${opt.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Mumbai'} to ${this.context.destination || 'Nagpur'} on ${this.context.date || 'Next Friday'}. Total fare is ₹${opt.price}. Would you like me to proceed with this booking?`;
+    const resp = `Selected ${opt.provider} (${opt.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Delhi'} to ${this.context.destination || 'Jodhpur'} on ${this.context.date || 'your travel date'}. Total fare is ₹${opt.price}. Would you like me to proceed with this booking?`;
     this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', performance.now(), true);
   }
 

@@ -8,7 +8,32 @@ interface CityTransitInfo {
   railwayCode: string;
   railwayName: string;
   busTerminal: string;
+  expressTrainName?: string;
+  trainNumber?: string;
 }
+
+const CITY_SPELLING_ALIASES: Record<string, string> = {
+  jodpur: 'jodhpur',
+  bombay: 'mumbai',
+  bangalore: 'bengaluru',
+  calcutta: 'kolkata',
+  madras: 'chennai',
+  cochin: 'kochi',
+  banaras: 'varanasi',
+  kashi: 'varanasi',
+  baroda: 'vadodara',
+  poona: 'pune',
+  trivandrum: 'thiruvananthapuram',
+  vizag: 'visakhapatnam',
+  mysore: 'mysuru',
+  prayag: 'prayagraj',
+  allahabad: 'prayagraj',
+  gurgaon: 'gurugram',
+  simla: 'shimla',
+  shrinagar: 'srinagar',
+  dilli: 'delhi',
+  amritser: 'amritsar',
+};
 
 const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
   mumbai: {
@@ -17,6 +42,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'CSTM',
     railwayName: 'CSMT / LTT Terminal',
     busTerminal: 'Borivali & Dadar Hub',
+    expressTrainName: 'Mumbai Superfast Express',
+    trainNumber: '12952',
   },
   delhi: {
     code: 'DEL',
@@ -24,6 +51,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'NDLS',
     railwayName: 'New Delhi Railway Station (NDLS)',
     busTerminal: 'ISBT Kashmiri Gate',
+    expressTrainName: 'Rajdhani Express',
+    trainNumber: '12431',
   },
   bengaluru: {
     code: 'BLR',
@@ -31,13 +60,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'SBC',
     railwayName: 'KSR Bengaluru City Junction (SBC)',
     busTerminal: 'Majestic Bus Stand',
-  },
-  bangalore: {
-    code: 'BLR',
-    airportName: 'Kempegowda International Terminal 1',
-    railwayCode: 'SBC',
-    railwayName: 'KSR Bengaluru City Junction (SBC)',
-    busTerminal: 'Majestic Bus Stand',
+    expressTrainName: 'Karnataka Express',
+    trainNumber: '12628',
   },
   nagpur: {
     code: 'NAG',
@@ -45,41 +69,17 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'NGP',
     railwayName: 'Nagpur Junction (NGP)',
     busTerminal: 'Ganeshpeth Bus Terminal',
+    expressTrainName: 'Nagpur Duronto SF Express',
+    trainNumber: '12290',
   },
-  pune: {
-    code: 'PNQ',
-    airportName: 'Pune Airport (Lohegaon)',
-    railwayCode: 'PUNE',
-    railwayName: 'Pune Junction (PUNE)',
-    busTerminal: 'Swargate / Wakad Bus Stand',
-  },
-  hyderabad: {
-    code: 'HYD',
-    airportName: 'Rajiv Gandhi International Terminal 1',
-    railwayCode: 'SC',
-    railwayName: 'Secunderabad Junction (SC)',
-    busTerminal: 'MGBS Hub',
-  },
-  chennai: {
-    code: 'MAA',
-    airportName: 'Chennai International Terminal 1',
-    railwayCode: 'MAS',
-    railwayName: 'MGR Chennai Central (MAS)',
-    busTerminal: 'CMBT Koyambedu',
-  },
-  kolkata: {
-    code: 'CCU',
-    airportName: 'Netaji Subhash Chandra Bose Terminal',
-    railwayCode: 'HWH',
-    railwayName: 'Howrah Junction (HWH)',
-    busTerminal: 'Esplanade Bus Terminus',
-  },
-  ahmedabad: {
-    code: 'AMD',
-    airportName: 'Sardar Vallabhbhai Patel Terminal',
-    railwayCode: 'ADI',
-    railwayName: 'Ahmedabad Junction (ADI)',
-    busTerminal: 'Gita Mandir Bus Stand',
+  jodhpur: {
+    code: 'JDH',
+    airportName: 'Jodhpur Civil Airport (JDH)',
+    railwayCode: 'JU',
+    railwayName: 'Jodhpur Junction (JU)',
+    busTerminal: 'Raika Bagh Central Bus Stand',
+    expressTrainName: 'Mandore Superfast Express',
+    trainNumber: '22996',
   },
   jaipur: {
     code: 'JAI',
@@ -87,6 +87,53 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'JP',
     railwayName: 'Jaipur Junction (JP)',
     busTerminal: 'Sindhi Camp Central',
+    expressTrainName: 'Jaipur Double Decker SF Express',
+    trainNumber: '12986',
+  },
+  pune: {
+    code: 'PNQ',
+    airportName: 'Pune Airport (Lohegaon)',
+    railwayCode: 'PUNE',
+    railwayName: 'Pune Junction (PUNE)',
+    busTerminal: 'Swargate / Wakad Bus Stand',
+    expressTrainName: 'Deccan Queen Superfast',
+    trainNumber: '12124',
+  },
+  hyderabad: {
+    code: 'HYD',
+    airportName: 'Rajiv Gandhi International Terminal 1',
+    railwayCode: 'SC',
+    railwayName: 'Secunderabad Junction (SC)',
+    busTerminal: 'MGBS Hub',
+    expressTrainName: 'Charminar Superfast Express',
+    trainNumber: '12760',
+  },
+  chennai: {
+    code: 'MAA',
+    airportName: 'Chennai International Terminal 1',
+    railwayCode: 'MAS',
+    railwayName: 'MGR Chennai Central (MAS)',
+    busTerminal: 'CMBT Koyambedu',
+    expressTrainName: 'Tamil Nadu Express',
+    trainNumber: '12622',
+  },
+  kolkata: {
+    code: 'CCU',
+    airportName: 'Netaji Subhash Chandra Bose Terminal',
+    railwayCode: 'HWH',
+    railwayName: 'Howrah Junction (HWH)',
+    busTerminal: 'Esplanade Bus Terminus',
+    expressTrainName: 'Howrah Mail Superfast',
+    trainNumber: '12810',
+  },
+  ahmedabad: {
+    code: 'AMD',
+    airportName: 'Sardar Vallabhbhai Patel Terminal',
+    railwayCode: 'ADI',
+    railwayName: 'Ahmedabad Junction (ADI)',
+    busTerminal: 'Gita Mandir Bus Stand',
+    expressTrainName: 'Gujarat Mail Superfast',
+    trainNumber: '12902',
   },
   lucknow: {
     code: 'LKO',
@@ -94,6 +141,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'LKO',
     railwayName: 'Lucknow Charbagh (LKO)',
     busTerminal: 'Alambagh Inter-State Terminal',
+    expressTrainName: 'Lucknow Mail Superfast',
+    trainNumber: '12230',
   },
   chandigarh: {
     code: 'IXC',
@@ -101,6 +150,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'CDG',
     railwayName: 'Chandigarh Junction (CDG)',
     busTerminal: 'Sector 43 ISBT',
+    expressTrainName: 'Chandigarh Shatabdi Express',
+    trainNumber: '12046',
   },
   varanasi: {
     code: 'VNS',
@@ -108,6 +159,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'BSB',
     railwayName: 'Varanasi Junction (BSB)',
     busTerminal: 'Cantt Roadways Bus Stand',
+    expressTrainName: 'Kashi Vishwanath Express',
+    trainNumber: '15128',
   },
   bhopal: {
     code: 'BHO',
@@ -115,6 +168,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'BPL',
     railwayName: 'Rani Kamlapati Station (RKMP)',
     busTerminal: 'Nadra Bus Stand',
+    expressTrainName: 'Bhopal Vande Bharat Express',
+    trainNumber: '20172',
   },
   indore: {
     code: 'IDR',
@@ -122,6 +177,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'INDB',
     railwayName: 'Indore Junction (INDB)',
     busTerminal: 'Sarwate Bus Stand',
+    expressTrainName: 'Malwa Superfast Express',
+    trainNumber: '12920',
   },
   patna: {
     code: 'PAT',
@@ -129,6 +186,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'PNBE',
     railwayName: 'Patna Junction (PNBE)',
     busTerminal: 'Bairiya ISBT Patna',
+    expressTrainName: 'Magadh Superfast Express',
+    trainNumber: '20802',
   },
   surat: {
     code: 'STV',
@@ -136,6 +195,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'ST',
     railwayName: 'Surat Railway Station (ST)',
     busTerminal: 'Surat Central Bus Station',
+    expressTrainName: 'Flying Ranee Superfast',
+    trainNumber: '12922',
   },
   kochi: {
     code: 'COK',
@@ -143,6 +204,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'ERS',
     railwayName: 'Ernakulam South Junction (ERS)',
     busTerminal: 'Vytilla Mobility Hub',
+    expressTrainName: 'Kerala Express',
+    trainNumber: '12626',
   },
   goa: {
     code: 'GOX',
@@ -150,6 +213,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'MAO',
     railwayName: 'Madgaon Junction (MAO)',
     busTerminal: 'Panjim Central Bus Stand',
+    expressTrainName: 'Mandovi Superfast Express',
+    trainNumber: '10104',
   },
   amritsar: {
     code: 'ATQ',
@@ -157,6 +222,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'ASR',
     railwayName: 'Amritsar Junction (ASR)',
     busTerminal: 'ISBT Amritsar',
+    expressTrainName: 'Golden Temple Mail',
+    trainNumber: '12903',
   },
   manali: {
     code: 'KUU',
@@ -164,6 +231,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'CDG',
     railwayName: 'Chandigarh / Kalka Link',
     busTerminal: 'Manali Private Volvo Bus Stand',
+    expressTrainName: 'Himalayan Queen Express',
+    trainNumber: '14095',
   },
   shimla: {
     code: 'SLV',
@@ -171,6 +240,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'SML',
     railwayName: 'Shimla Toy Train Station (SML)',
     busTerminal: 'ISBT Tutikandi Shimla',
+    expressTrainName: 'Shivalik Deluxe Express',
+    trainNumber: '52451',
   },
   dehradun: {
     code: 'DED',
@@ -178,6 +249,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'DDN',
     railwayName: 'Dehradun Railway Station (DDN)',
     busTerminal: 'ISBT Dehradun',
+    expressTrainName: 'Dehradun Shatabdi Express',
+    trainNumber: '12017',
   },
   ayodhya: {
     code: 'AYJ',
@@ -185,6 +258,8 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'AY',
     railwayName: 'Ayodhya Dham Junction (AY)',
     busTerminal: 'Ayodhya Dham Central Bus Stand',
+    expressTrainName: 'Vande Bharat Ayodhya Express',
+    trainNumber: '22425',
   },
   shirdi: {
     code: 'SAG',
@@ -192,36 +267,86 @@ const INDIAN_CITIES_MAP: Record<string, CityTransitInfo> = {
     railwayCode: 'SNSI',
     railwayName: 'Sainagar Shirdi Station (SNSI)',
     busTerminal: 'Shirdi Nagar Bus Stand',
+    expressTrainName: 'Sainagar Shirdi Superfast Express',
+    trainNumber: '22602',
+  },
+  udaipur: {
+    code: 'UDR',
+    airportName: 'Maharana Pratap Airport (UDR)',
+    railwayCode: 'UDZ',
+    railwayName: 'Udaipur City Station (UDZ)',
+    busTerminal: 'Udiapole Central Bus Stand',
+    expressTrainName: 'Chetak Superfast Express',
+    trainNumber: '20473',
+  },
+  srinagar: {
+    code: 'SXR',
+    airportName: 'Sheikh ul-Alam International Airport',
+    railwayCode: 'SINA',
+    railwayName: 'Srinagar Railway Station (SINA)',
+    busTerminal: 'TRC Bus Station Srinagar',
+    expressTrainName: 'Vande Bharat Kashmir Express',
+    trainNumber: '22477',
+  },
+  kashmir: {
+    code: 'SXR',
+    airportName: 'Sheikh ul-Alam International Airport',
+    railwayCode: 'SINA',
+    railwayName: 'Srinagar Kashmir Station (SINA)',
+    busTerminal: 'TRC Bus Station Srinagar',
+    expressTrainName: 'Kashmir Valley Express',
+    trainNumber: '22477',
+  },
+  kerala: {
+    code: 'COK',
+    airportName: 'Cochin International Terminal',
+    railwayCode: 'ERS',
+    railwayName: 'Ernakulam South Junction (ERS)',
+    busTerminal: 'Vytilla Mobility Hub',
+    expressTrainName: 'Kerala Superfast Express',
+    trainNumber: '12626',
+  },
+  rajasthan: {
+    code: 'JAI',
+    airportName: 'Jaipur International Airport',
+    railwayCode: 'JP',
+    railwayName: 'Jaipur Junction (JP)',
+    busTerminal: 'Sindhi Camp Central',
+    expressTrainName: 'Rajasthan Sampark Kranti',
+    trainNumber: '12464',
   },
 };
 
+export function normalizeCityName(raw: string): string {
+  if (!raw) return 'India';
+  const clean = raw.trim().toLowerCase();
+  const resolved = CITY_SPELLING_ALIASES[clean] || clean;
+  return resolved
+    .split(/\s+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+}
+
 function resolveCityInfo(name: string): CityTransitInfo {
-  const clean = name.trim().toLowerCase();
+  const clean = normalizeCityName(name).toLowerCase();
   for (const [key, info] of Object.entries(INDIAN_CITIES_MAP)) {
-    if (clean.includes(key)) {
+    if (clean.includes(key) || key.includes(clean)) {
       return info;
     }
   }
 
   // Universal fallback for any Indian town, state, or village
   const code = (clean.replace(/[^a-z]/g, '').slice(0, 3) || 'IND').toUpperCase();
-  const title = name.trim().charAt(0).toUpperCase() + name.trim().slice(1);
+  const title = normalizeCityName(name);
   return {
     code,
-    airportName: `${title} Domestic Terminal`,
+    airportName: `${title} Domestic Terminal (${code})`,
     railwayCode: code,
     railwayName: `${title} Junction (${code})`,
     busTerminal: `${title} Central Bus Station`,
+    expressTrainName: `${title} Superfast Express`,
+    trainNumber: `12${Math.floor(100 + Math.random() * 800)}`,
   };
-}
-
-function capitalizeCity(name: string): string {
-  if (!name) return 'India';
-  return name
-    .trim()
-    .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-    .join(' ');
 }
 
 class TravelEngineService {
@@ -229,7 +354,7 @@ class TravelEngineService {
   private activeHolds: Map<string, BookingHold> = new Map();
 
   constructor() {
-    this.currentOptions = this.generateOptionsForRoute('Bengaluru', 'Nagpur', 'Next Friday', 1);
+    this.currentOptions = this.generateOptionsForRoute('Bengaluru', 'Jodhpur', 'Next Friday', 1);
   }
 
   public generateOptionsForRoute(
@@ -238,8 +363,8 @@ class TravelEngineService {
     date: string,
     passengersCount: number = 1
   ): TravelOption[] {
-    const origin = capitalizeCity(originRaw || 'Bengaluru');
-    const destination = capitalizeCity(destinationRaw || 'Nagpur');
+    const origin = normalizeCityName(originRaw || 'Bengaluru');
+    const destination = normalizeCityName(destinationRaw || 'Jodhpur');
     const oInfo = resolveCityInfo(origin);
     const dInfo = resolveCityInfo(destination);
     const pCount = Math.max(1, passengersCount);
@@ -251,6 +376,9 @@ class TravelEngineService {
     const baseBusSleeper = 1450;
     const baseBusSemi = 980;
     const baseHotel = 3200;
+
+    const trainName = dInfo.expressTrainName || `${destination} SF Express`;
+    const trainNum = dInfo.trainNumber || `12${Math.floor(100 + Math.random() * 800)}`;
 
     const options: TravelOption[] = [
       // 1. FASTEST DIRECT FLIGHT
@@ -267,8 +395,8 @@ class TravelEngineService {
         destCode: dInfo.code,
         destTerminal: dInfo.airportName,
         departureTime: '06:20 AM',
-        arrivalTime: '08:05 AM',
-        duration: '1h 45m (Non-stop)',
+        arrivalTime: '08:15 AM',
+        duration: '1h 55m (Non-stop)',
         price: (baseFlight + 350) * pCount,
         baseFare: (baseFlight - 400) * pCount,
         taxesAndFees: 450 * pCount,
@@ -289,10 +417,10 @@ class TravelEngineService {
         convenienceScore: 95,
         isRecommended: true,
         recommendationTag: 'Top Pick • Fastest Direct Flight',
-        tradeOffDescription: `Direct morning flight reaching ${destination} in 1h 45m. Includes 15 kg check-in baggage.`,
+        tradeOffDescription: `Direct morning flight to ${destination} in 1h 55m. Includes 15 kg check-in baggage.`,
       },
 
-      // 2. BEST VALUE EVENING FLIGHT
+      // 2. BEST VALUE AFTERNOON FLIGHT
       {
         id: `opt-flight-akasa-${Date.now()}-2`,
         mode: 'flight',
@@ -306,8 +434,8 @@ class TravelEngineService {
         destCode: dInfo.code,
         destTerminal: dInfo.airportName,
         departureTime: '02:30 PM',
-        arrivalTime: '04:15 PM',
-        duration: '1h 45m (Direct)',
+        arrivalTime: '04:25 PM',
+        duration: '1h 55m (Direct)',
         price: baseFlight * pCount,
         baseFare: (baseFlight - 600) * pCount,
         taxesAndFees: 350 * pCount,
@@ -337,7 +465,7 @@ class TravelEngineService {
         mode: 'train',
         provider: 'IRCTC Indian Railways',
         operator: 'Indian Railways',
-        serviceNumber: `${destination.toUpperCase().slice(0, 3)} SF Express (12809)`,
+        serviceNumber: `${trainName} (${trainNum})`,
         origin: origin,
         originCode: oInfo.railwayCode,
         originTerminal: oInfo.railwayName,
@@ -366,7 +494,7 @@ class TravelEngineService {
         convenienceScore: 86,
         isRecommended: true,
         recommendationTag: '3AC Comfort Sleeper • Best Balance',
-        tradeOffDescription: `Overnight journey with confirmed lower/upper berths, clean bedroll, and pantry meals.`,
+        tradeOffDescription: `Overnight journey on ${trainName} with confirmed berths, clean bedroll, and pantry meals.`,
       },
 
       // 4. IRCTC SLEEPER CLASS (SL) TRAIN
@@ -375,7 +503,7 @@ class TravelEngineService {
         mode: 'train',
         provider: 'IRCTC Indian Railways',
         operator: 'Indian Railways',
-        serviceNumber: `${destination.toUpperCase().slice(0, 3)} Express (11039)`,
+        serviceNumber: `${trainName} Express (${trainNum})`,
         origin: origin,
         originCode: oInfo.railwayCode,
         originTerminal: oInfo.railwayName,
@@ -413,7 +541,7 @@ class TravelEngineService {
         mode: 'train',
         provider: 'IRCTC Indian Railways',
         operator: 'Indian Railways',
-        serviceNumber: `${destination.toUpperCase().slice(0, 3)} Rajdhani / SF (12431)`,
+        serviceNumber: `${trainName} (2AC Executive)`,
         origin: origin,
         originCode: oInfo.railwayCode,
         originTerminal: oInfo.railwayName,
@@ -451,7 +579,7 @@ class TravelEngineService {
         mode: 'bus',
         provider: 'IntrCity SmartBus',
         operator: 'IntrCity',
-        serviceNumber: `IC-${destination.toUpperCase().slice(0, 3)}-EXP`,
+        serviceNumber: `IC-${dInfo.code}-EXP`,
         origin: origin,
         originCode: `${oInfo.code}-BUS`,
         originTerminal: oInfo.busTerminal,
@@ -480,7 +608,7 @@ class TravelEngineService {
         convenienceScore: 79,
         isRecommended: false,
         recommendationTag: 'BharatBenz AC Sleeper Bus',
-        tradeOffDescription: `Single/Double sleeper berths with charging ports, private AC louvers, and mineral water.`,
+        tradeOffDescription: `Single/Double sleeper berths to ${dInfo.busTerminal} with charging ports and blanket.`,
       },
 
       // 7. VOLVO SEMI-SLEEPER BUS
@@ -489,7 +617,7 @@ class TravelEngineService {
         mode: 'bus',
         provider: 'Zingbus Electric',
         operator: 'Zingbus',
-        serviceNumber: `ZB-${destination.toUpperCase().slice(0, 3)}-VOLVO`,
+        serviceNumber: `ZB-${dInfo.code}-VOLVO`,
         origin: origin,
         originCode: `${oInfo.code}-BUS`,
         originTerminal: oInfo.busTerminal,
@@ -533,7 +661,7 @@ class TravelEngineService {
         originTerminal: `${destination} City Center`,
         destination: destination,
         destCode: dInfo.code,
-        destTerminal: 'Near Central Station & Airport',
+        destTerminal: `Near ${dInfo.railwayName}`,
         departureTime: 'Check-in: 01:00 PM',
         arrivalTime: 'Check-out: 11:00 AM',
         duration: '1 Night Stay',
@@ -556,7 +684,7 @@ class TravelEngineService {
         convenienceScore: 88,
         isRecommended: false,
         recommendationTag: `Top Rated Hotel in ${destination}`,
-        tradeOffDescription: `4.6★ Rating. Located 15 mins from station & airport. Free buffet breakfast and WiFi.`,
+        tradeOffDescription: `4.6★ Rating. Located 15 mins from ${dInfo.railwayCode} station. Free breakfast & WiFi.`,
       },
     ];
 
@@ -659,7 +787,7 @@ class TravelEngineService {
   }
 
   public resetInventory(): void {
-    this.currentOptions = this.generateOptionsForRoute('Bengaluru', 'Nagpur', 'Next Friday', 1);
+    this.currentOptions = this.generateOptionsForRoute('Bengaluru', 'Jodhpur', 'Next Friday', 1);
     this.activeHolds.clear();
   }
 
