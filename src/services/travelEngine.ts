@@ -9,19 +9,30 @@ class TravelEngineService {
     origin: string,
     destination: string,
     date: string,
-    budget: number = 8000
+    budget?: number | null,
+    mode?: string | null
   ): Promise<{ options: TravelOption[]; searchLatencyMs: number }> {
     // Simulate real GDS/Aggregator API latency
     const start = performance.now();
     await new Promise((r) => setTimeout(r, 280));
 
     const isKochi = destination.toLowerCase().includes('kochi') || destination.toLowerCase().includes('cochin');
-    const sourcePool = isKochi ? [...KOCHI_OPTIONS] : [...this.currentOptions];
+    let sourcePool = isKochi ? [...KOCHI_OPTIONS] : [...this.currentOptions];
 
-    // Filter by budget & sort by convenience score
-    const filtered = sourcePool
-      .filter((opt) => opt.price <= budget + 1000)
-      .sort((a, b) => b.convenienceScore - a.convenienceScore);
+    // Filter by mode if specified
+    if (mode && mode !== 'all') {
+      const modeLower = mode.toLowerCase();
+      sourcePool = sourcePool.filter((opt) => opt.mode.toLowerCase() === modeLower);
+    }
+
+    // Filter by budget only if explicitly provided by the user
+    let filtered = sourcePool;
+    if (budget && budget > 0) {
+      filtered = sourcePool.filter((opt) => opt.price <= budget + 1000);
+    }
+
+    // Sort: if budget provided sort by convenience, otherwise show varied options (flight, train, bus)
+    filtered.sort((a, b) => b.convenienceScore - a.convenienceScore);
 
     const searchLatencyMs = Math.round(performance.now() - start);
     return { options: filtered, searchLatencyMs };

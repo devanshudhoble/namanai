@@ -25,7 +25,7 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'Bangalore to Goa • ₹8k budget • Convenience',
       prompt: 'Hi, I want to travel from Bangalore to Goa next Friday. My budget is around ₹8,000. I prefer a convenient journey and don\'t want to spend too much time comparing options.',
       icon: Plane,
-      color: 'from-cyan-500/20 to-blue-500/20 text-cyan-400 border-cyan-800/80',
+      color: 'bg-blue-50/60 hover:bg-blue-50 border-blue-200 text-blue-700',
     },
     {
       id: 'sc-2',
@@ -33,7 +33,7 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'Does ₹5,400 fare include check-in baggage?',
       prompt: 'Wait, does the ₹5,400 flight include check-in baggage? Because last time I booked a Saver fare, they charged me extra at the counter.',
       icon: Luggage,
-      color: 'from-blue-500/20 to-indigo-500/20 text-blue-400 border-blue-800/80',
+      color: 'bg-indigo-50/60 hover:bg-indigo-50 border-indigo-200 text-indigo-700',
     },
     {
       id: 'sc-3',
@@ -41,7 +41,7 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'Switch destination to Kochi',
       prompt: 'Actually wait! Don\'t book Goa. My friends just changed the plan to Kochi. Can we check Kochi instead?',
       icon: MapPin,
-      color: 'from-teal-500/20 to-emerald-500/20 text-teal-400 border-teal-800/80',
+      color: 'bg-teal-50/60 hover:bg-teal-50 border-teal-200 text-teal-700',
     },
     {
       id: 'sc-4',
@@ -49,7 +49,7 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'IndiGo surges to ₹8,600 • Akasa fallback',
       prompt: 'The fare spiked above my budget. What are my alternatives?',
       icon: TrendingUp,
-      color: 'from-rose-500/20 to-amber-500/20 text-rose-400 border-rose-800/80',
+      color: 'bg-rose-50/60 hover:bg-rose-50 border-rose-200 text-rose-700',
     },
     {
       id: 'sc-5',
@@ -57,7 +57,7 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'Triggers automated 3-way reconciliation',
       prompt: 'My money has been deducted from Google Pay, but my ticket is not confirmed and shows pending!',
       icon: CreditCard,
-      color: 'from-amber-500/20 to-orange-500/20 text-amber-400 border-amber-800/80',
+      color: 'bg-amber-50/60 hover:bg-amber-50 border-amber-200 text-amber-800',
     },
     {
       id: 'sc-6',
@@ -65,21 +65,21 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       subtitle: 'Calculate net refund under airline policy',
       prompt: 'I want to cancel my Goa flight booking. How much refund will I get?',
       icon: RefreshCw,
-      color: 'from-purple-500/20 to-pink-500/20 text-purple-400 border-purple-800/80',
+      color: 'bg-purple-50/60 hover:bg-purple-50 border-purple-200 text-purple-700',
     },
   ];
 
   return (
-    <div className="glass-panel p-4 rounded-2xl border border-slate-800 shadow-lg">
+    <div className="bg-white p-4 rounded-2xl border border-slate-200/90 shadow-xs">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center space-x-2">
-          <Sparkles className="w-4 h-4 text-cyan-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-            1-Click Executive Demo Scenarios
+          <Sparkles className="w-4 h-4 text-blue-600" />
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-800">
+            1-Click Interactive Test Scenarios
           </h3>
         </div>
-        <span className="text-[11px] text-slate-400">
-          Simulate realistic conversational edge-cases
+        <span className="text-[11px] text-slate-500 font-medium">
+          Instant demo triggers for testing conversations
         </span>
       </div>
 
@@ -91,13 +91,13 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
               key={sc.id}
               disabled={isProcessing}
               onClick={() => onTriggerScenario(sc.prompt)}
-              className={`p-3 rounded-xl border text-left bg-gradient-to-br hover:scale-[1.01] transition-all duration-200 cursor-pointer disabled:opacity-50 ${sc.color}`}
+              className={`p-3 rounded-xl border text-left hover:scale-[1.01] transition-all duration-200 cursor-pointer disabled:opacity-50 shadow-2xs ${sc.color}`}
             >
               <div className="flex items-start space-x-2">
                 <Icon className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="overflow-hidden">
-                  <h4 className="text-xs font-bold text-white truncate">{sc.title}</h4>
-                  <p className="text-[11px] text-slate-300 truncate">{sc.subtitle}</p>
+                  <h4 className="text-xs font-bold text-slate-900 truncate">{sc.title}</h4>
+                  <p className="text-[11px] text-slate-600 truncate font-medium">{sc.subtitle}</p>
                 </div>
               </div>
             </button>

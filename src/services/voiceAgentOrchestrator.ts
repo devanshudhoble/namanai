@@ -16,7 +16,8 @@ export interface AgentContext {
   origin: string;
   destination: string;
   date: string;
-  budget: number;
+  budget: number | null;
+  modePreference: 'flight' | 'train' | 'bus' | 'all' | null;
   preference: string;
   options: TravelOption[];
   selectedOption: TravelOption | null;
@@ -40,10 +41,11 @@ export class VoiceAgentOrchestrator {
   private getInitialContext(): AgentContext {
     return {
       origin: 'Bengaluru',
-      destination: 'Goa',
-      date: 'Next Friday (Nov 6)',
-      budget: 8000,
-      preference: 'Convenience, Fast, Non-stop',
+      destination: '',
+      date: '',
+      budget: null,
+      modePreference: 'all',
+      preference: 'Convenience',
       options: [],
       selectedOption: null,
       hold: null,
@@ -200,21 +202,181 @@ export class VoiceAgentOrchestrator {
     this.isProcessing = false;
   }
 
-  // --- HANDLER 1: PRIMARY DISCOVERY & SEARCH ---
+  // --- HANDLER 1: PRIMARY DISCOVERY & MULTI-MODAL SEARCH (FLIGHT, TRAIN, BUS) ---
   private async handlePrimarySearchIntent(rawText: string, startTime: number, voiceTrigger: boolean) {
+    const lower = rawText.toLowerCase();
+
+    // 1. Slot Extraction
+    if (lower.includes('goa')) {
+      this.context.destination = 'Goa';
+    } else if (lower.includes('kochi') || lower.includes('cochin')) {
+      this.context.destination = 'Kochi';
+    } else if (lower.includes('mumbai')) {
+      this.context.destination = 'Mumbai';
+    } else if (lower.includes('delhi')) {
+      this.context.destination = 'Delhi';
+    }
+
+    if (lower.includes('bangalore') || lower.includes('bengaluru') || lower.includes('blr')) {
+      this.context.origin = 'Bengaluru';
+    }
+
+    // Extract Date
+    if (
+      lower.includes('friday') ||
+      lower.includes('tomorrow') ||
+      lower.includes('next week') ||
+      lower.includes('nov') ||
+      lower.includes('weekend')
+    ) {
+      this.context.date = 'Next Friday (Nov 6)';
+    }
+
+    // Extract Travel Mode
+    if (lower.includes('train') || lower.includes('railway') || lower.includes('irctc')) {
+      this.context.modePreference = 'train';
+    } else if (lower.includes('bus') || lower.includes('sleeper')) {
+      this.context.modePreference = 'bus';
+    } else if (lower.includes('flight') || lower.includes('plane') || lower.includes('fly')) {
+      this.context.modePreference = 'flight';
+    }
+
+    // Extract Budget if explicitly stated by user
+    if (lower.includes('8000') || lower.includes('8k') || lower.includes('₹8,000')) {
+      this.context.budget = 8000;
+    } else {
+      const budgetMatch = rawText.match(
+        /(?:budget|around|under|₹|rs\.?|inr)?\s*(\d{1,2}(?:,\d{3})+|\d+)\s*(?:k|thousand|rupees)?/i
+      );
+      if (budgetMatch) {
+        const parsed = parseInt(budgetMatch[1].replace(/,/g, ''), 10);
+        if (parsed >= 500) {
+          this.context.budget = parsed;
+        }
+      }
+    }
+
+    // 2. DISCOVERY CASE A: User ONLY specified destination (e.g. "goa" or "i want to visit goa")
+    // Date, budget, and travel mode are MISSING!
+    if (
+      this.context.destination &&
+      !this.context.date &&
+      !this.context.budget &&
+      !lower.includes('flight') &&
+      !lower.includes('bus') &&
+      !lower.includes('train')
+    ) {
+      const totalLatency = Math.round(performance.now() - startTime);
+      const agentResponse = `${this.context.destination} is a wonderful choice! When are you planning to travel, and do you prefer flying, taking a scenic train (like the Vasco Express), or an overnight sleeper bus? Let me know if you have a budget in mind so I can filter the best options for you.`;
+
+      const agentMsg: Message = {
+        id: `agent-${Date.now()}`,
+        role: 'agent',
+        text: agentResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        intentDetected: 'SLOT_DISCOVERY_MISSING_DATE_MODE_BUDGET',
+        latencyMs: totalLatency,
+      };
+
+      this.appendMessage(agentMsg);
+      if (voiceTrigger) speechService.speak(agentResponse);
+      return;
+    }
+
+    // 3. User specifically asked for Train
+    if (this.context.modePreference === 'train' || (lower.includes('train') && !lower.includes('flight'))) {
+      this.context.step = 'discovering';
+      this.onStateChange({ ...this.context });
+      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
+        'BLR',
+        this.context.destination || 'GOA',
+        this.context.date || 'Next Friday',
+        null,
+        'train'
+      );
+      this.context.options = options;
+      this.context.selectedOption = options[0];
+      this.context.step = 'options_presented';
+
+      const totalLatency = Math.round(performance.now() - startTime);
+      const agentResponse = `For trains from Bangalore to Goa, we have the direct **17309 Vasco Da Gama Express** departing KSR City Station at 2:30 PM, reaching Madgaon at 11:10 PM. Total fare is **₹1,280** for a 3AC Sleeper berth, including 40 kg baggage. Would you like me to reserve a berth for you?`;
+
+      const agentMsg: Message = {
+        id: `agent-${Date.now()}`,
+        role: 'agent',
+        text: agentResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        intentDetected: 'TRAIN_SCHEDULE_RECOMMENDATION',
+        toolCall: {
+          name: 'search_train_inventory',
+          params: { trainNo: '17309', route: 'SBC-MAO', class: '3A', fare: 1280 },
+          resultSummary: 'IRCTC 17309 Vasco Express 3AC confirmed available at ₹1,280',
+          durationMs: searchLatencyMs,
+        },
+        latencyMs: totalLatency,
+      };
+
+      this.appendMessage(agentMsg);
+      if (voiceTrigger) speechService.speak(agentResponse);
+      return;
+    }
+
+    // 4. User specifically asked for Bus
+    if (this.context.modePreference === 'bus' || (lower.includes('bus') && !lower.includes('flight'))) {
+      this.context.step = 'discovering';
+      this.onStateChange({ ...this.context });
+      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
+        'BLR',
+        this.context.destination || 'GOA',
+        this.context.date || 'Next Friday',
+        null,
+        'bus'
+      );
+      this.context.options = options;
+      this.context.selectedOption = options[0];
+      this.context.step = 'options_presented';
+
+      const totalLatency = Math.round(performance.now() - startTime);
+      const agentResponse = `For buses to Goa, we have the **IntrCity SmartBus Premium AC Sleeper** departing Indiranagar at 9:30 PM Thursday night, arriving Panjim at 8:00 AM Friday for **₹2,200**. It includes 20 kg luggage storage. Would you like me to lock a sleeper berth?`;
+
+      const agentMsg: Message = {
+        id: `agent-${Date.now()}`,
+        role: 'agent',
+        text: agentResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        intentDetected: 'BUS_SCHEDULE_RECOMMENDATION',
+        toolCall: {
+          name: 'search_bus_inventory',
+          params: { route: 'BLR-GOA', type: 'AC_SLEEPER', fare: 2200 },
+          resultSummary: 'IntrCity SmartBus AC Sleeper confirmed available at ₹2,200',
+          durationMs: searchLatencyMs,
+        },
+        latencyMs: totalLatency,
+      };
+
+      this.appendMessage(agentMsg);
+      if (voiceTrigger) speechService.speak(agentResponse);
+      return;
+    }
+
+    // 5. Multi-modal Search across Flight, Train, and Bus!
     this.context.step = 'discovering';
     this.onStateChange({ ...this.context });
 
     const searchToolStart = performance.now();
+    const targetDate = this.context.date || '2026-11-06 (Next Friday)';
+    const targetDest = this.context.destination || 'GOA';
+
     const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
       'BLR',
-      'GOA',
-      '2026-11-06',
-      8000
+      targetDest,
+      targetDate,
+      this.context.budget,
+      null // search all modes: flight, train, bus
     );
 
     this.context.options = options;
-    this.context.selectedOption = options[0]; // IndiGo 6E-512 as top recommendation
+    this.context.selectedOption = options[0]; // IndiGo 6E-512 as top flight recommendation
     this.context.step = 'options_presented';
 
     const toolDuration = Math.round(performance.now() - searchToolStart);
@@ -227,22 +389,44 @@ export class VoiceAgentOrchestrator {
       groundingStatus: 'VERIFIED_API',
     };
 
-    const agentResponse =
-      "I've reviewed live schedules. Here are the two most practical options within your ₹8,000 budget:\n\n" +
-      "1. **IndiGo Flight 6E-512**: Departs Kempegowda at 11:15 AM, reaching Mopa Goa in 1 hour 15 minutes. Total fare is **₹5,400**, well under your budget.\n" +
-      "2. **IntrCity SmartBus Sleeper**: Departs Indiranagar at 9:30 PM Thursday night, arriving Panjim at 8:00 AM Friday for **₹2,200**.\n\n" +
-      "Given your focus on convenience and saving time, the IndiGo flight is the smoothest option. Would you like me to lock this seat for you?";
+    let agentResponse = '';
+
+    // If budget was explicitly stated:
+    if (this.context.budget) {
+      agentResponse =
+        `I've reviewed live schedules for ${targetDest} next Friday within your ₹${this.context.budget} budget across flight, train, and bus:\n\n` +
+        `1. **IndiGo Flight 6E-512**: Departs Kempegowda at 11:15 AM, reaching Mopa Goa in 1h 15m at **₹5,400** (well under your ₹${this.context.budget} budget).\n` +
+        `2. **IntrCity SmartBus Sleeper**: Departs Indiranagar at 9:30 PM Thursday night, arriving 8:00 AM Friday for **₹2,200**.\n` +
+        `3. **Vasco Express Train (17309)**: Direct 3AC Sleeper at **₹1,280** with 40 kg baggage.\n\n` +
+        `Given your focus on convenience and saving time, the IndiGo flight is the smoothest option. Would you like me to lock this seat for you?`;
+    } else {
+      // If NO budget was stated: Do NOT hallucinate ₹8,000! Present all 3 choices clearly.
+      agentResponse =
+        `I've pulled up live options across flight, train, and bus for Goa next Friday:\n\n` +
+        `1. **Flight (IndiGo 6E-512)**: Non-stop in 1h 15m at **₹5,400** (fastest & most convenient).\n` +
+        `2. **Bus (IntrCity SmartBus)**: Overnight AC Sleeper at **₹2,200** (saves hotel stay).\n` +
+        `3. **Train (IRCTC Vasco Express 17309)**: Direct 3AC Sleeper at **₹1,280** with 40 kg free baggage.\n\n` +
+        `Which mode do you prefer, or do you have a specific budget you'd like to stay under?`;
+    }
 
     const agentMsg: Message = {
       id: `agent-${Date.now()}`,
       role: 'agent',
       text: agentResponse,
       timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'TRAVEL_DISCOVERY_FLIGHT_VS_BUS',
+      intentDetected: this.context.budget
+        ? 'BUDGET_CURATED_OPTIONS'
+        : 'MULTI_MODAL_DISCOVERY_FLIGHT_TRAIN_BUS',
       toolCall: {
         name: 'search_transport_options',
-        params: { origin: 'BLR', destination: 'GOA', budget: 8000, preference: 'convenience' },
-        resultSummary: `Returned ${options.length} verified options via GDS API`,
+        params: {
+          origin: 'BLR',
+          destination: targetDest,
+          date: targetDate,
+          budget: this.context.budget || 'UNCONSTRAINED',
+          modes: ['flight', 'train', 'bus'],
+        },
+        resultSummary: `Returned ${options.length} verified multi-modal options via GDS & IRCTC APIs`,
         durationMs: searchLatencyMs,
       },
       latencyMs: totalLatency,
