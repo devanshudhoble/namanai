@@ -3,7 +3,6 @@ import { Header } from './components/Header';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ConversationalFeed } from './components/ConversationalFeed';
 import { TravelCanvas } from './components/TravelCanvas';
-import { AnalyticsDrawer } from './components/AnalyticsDrawer';
 import { ApiSettingsModal } from './components/ApiSettingsModal';
 import { VoiceAgentOrchestrator, AgentContext } from './services/voiceAgentOrchestrator';
 import { speechService } from './services/speechService';
@@ -16,7 +15,6 @@ export function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [dialect, setDialect] = useState('en-IN');
-  const [isAnalyticsOpen, setIsAnalyticsOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [apiConfig, setApiConfig] = useState<ApiKeysConfig>({ mode: 'sandbox' });
 
@@ -131,7 +129,6 @@ export function App() {
     <div className="min-h-screen bg-[#F4F7FB] text-slate-800 flex flex-col font-['Plus_Jakarta_Sans'] pb-20">
       {/* Header */}
       <Header
-        onOpenAnalytics={() => setIsAnalyticsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onReset={handleReset}
         latencyMs={context.telemetry.totalLatencyMs}
@@ -281,13 +278,6 @@ export function App() {
           </button>
         </div>
       </nav>
-
-      {/* Analytics Drawer (Pillar 1) */}
-      <AnalyticsDrawer
-        isOpen={isAnalyticsOpen}
-        onClose={() => setIsAnalyticsOpen(false)}
-        telemetry={context.telemetry}
-      />
 
       {/* API Integrations Settings Modal */}
       <ApiSettingsModal

@@ -2,6 +2,7 @@ import {
   AgentStateStep,
   BookingHold,
   Message,
+  PassengerDetails,
   PaymentTransaction,
   TelemetryMetrics,
   TravelOption,
@@ -17,7 +18,9 @@ export interface AgentContext {
   destination: string;
   date: string;
   budget: number | null;
-  modePreference: 'flight' | 'train' | 'bus' | 'all' | null;
+  modePreference: 'flight' | 'train' | 'bus' | 'hotel' | 'all' | null;
+  selectedClass: string | null;
+  passengerName: string;
   preference: string;
   options: TravelOption[];
   selectedOption: TravelOption | null;
@@ -45,6 +48,8 @@ export class VoiceAgentOrchestrator {
       date: '',
       budget: null,
       modePreference: 'all',
+      selectedClass: null,
+      passengerName: '',
       preference: 'Convenience',
       options: [],
       selectedOption: null,
@@ -55,7 +60,7 @@ export class VoiceAgentOrchestrator {
         {
           id: 'msg-welcome',
           role: 'agent',
-          text: 'Hello Rahul! Where are you thinking of traveling?',
+          text: 'Namaste! Where would you like to travel?',
           timestamp: new Date().toLocaleTimeString(),
           isSpoken: true,
         },
@@ -134,7 +139,128 @@ export class VoiceAgentOrchestrator {
       return;
     }
 
-    // 1. SCENARIO 5: Payment Deducted / Ticket Pending Exception Recovery
+    // 0. Dynamic Passenger Name Handling (User answering "What is the passenger name?")
+    const nameMatch = text.match(/(?:my name is|name is|i am|for|passenger is)\s+([A-Za-z\s]+)/i);
+    const words = text.trim().split(/\s+/);
+    const isSingleOrDoubleWordName = words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'kochi', '3ac', '2ac', 'sleeper'].includes(lower);
+
+    if (
+      this.context.selectedOption &&
+      !this.context.passengerName &&
+      (nameMatch || isSingleOrDoubleWordName)
+    ) {
+      const capturedName = (nameMatch ? nameMatch[1] : text).trim();
+      if (capturedName.length >= 2) {
+        this.context.passengerName = capturedName;
+        await this.handleNameProvidedAndConfirmHold(capturedName, startTime, voiceTrigger);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    // 1. Train Class Selection (Sleeper, 3AC, 2AC)
+    if (lower.includes('3ac') || lower.includes('3 ac') || lower.includes('third ac')) {
+      const train3ac = this.context.options.find((o) => o.id === 'opt-irctc-train-17309') || this.context.options[0];
+      if (train3ac) {
+        this.context.selectedOption = train3ac;
+        this.context.selectedClass = '3AC';
+        this.onStateChange({ ...this.context });
+        const resp = `Selected 3AC Sleeper at ₹1,280. What is the passenger's full name to book the ticket?`;
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'TRAIN_CLASS_3AC_SELECTED',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    if (lower.includes('2ac') || lower.includes('2 ac') || lower.includes('second ac')) {
+      const train2ac = this.context.options.find((o) => o.id === 'opt-irctc-train-2ac') || this.context.options[0];
+      if (train2ac) {
+        this.context.selectedOption = train2ac;
+        this.context.selectedClass = '2AC';
+        this.onStateChange({ ...this.context });
+        const resp = `Selected 2AC Comfort Sleeper at ₹1,850. What is the passenger's full name to book the ticket?`;
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'TRAIN_CLASS_2AC_SELECTED',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    if (lower.includes('sleeper') && !lower.includes('bus')) {
+      const trainSL = this.context.options.find((o) => o.id === 'opt-irctc-train-sleeper') || this.context.options[0];
+      if (trainSL) {
+        this.context.selectedOption = trainSL;
+        this.context.selectedClass = 'Sleeper';
+        this.onStateChange({ ...this.context });
+        const resp = `Selected Sleeper class at ₹420. What is the passenger's full name to book the ticket?`;
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'TRAIN_CLASS_SLEEPER_SELECTED',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    // 2. Bus Class Selection (AC Sleeper vs Semi-Sleeper)
+    if (lower.includes('semi sleeper') || lower.includes('semi-sleeper')) {
+      const busSemi = this.context.options.find((o) => o.id === 'opt-zingbus-semi-sleeper') || this.context.options[0];
+      if (busSemi) {
+        this.context.selectedOption = busSemi;
+        this.context.selectedClass = 'Semi-Sleeper';
+        this.onStateChange({ ...this.context });
+        const resp = `Selected Volvo Semi-Sleeper at ₹1,450. What is the passenger's full name for the bus ticket?`;
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'BUS_SEMI_SLEEPER_SELECTED',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    if (lower.includes('ac sleeper') || lower.includes('sleeper bus')) {
+      const busSleeper = this.context.options.find((o) => o.id === 'opt-smartbus-sleeper') || this.context.options[0];
+      if (busSleeper) {
+        this.context.selectedOption = busSleeper;
+        this.context.selectedClass = 'AC Sleeper';
+        this.onStateChange({ ...this.context });
+        const resp = `Selected BharatBenz AC Sleeper at ₹2,200. What is the passenger's full name for the bus ticket?`;
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'BUS_AC_SLEEPER_SELECTED',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    // 3. SCENARIO 5: Payment Deducted / Ticket Pending Exception Recovery
     if (
       lower.includes('money has been deducted') ||
       lower.includes('money was deducted') ||
@@ -148,21 +274,21 @@ export class VoiceAgentOrchestrator {
       return;
     }
 
-    // 2. SCENARIO 4: Fare Spike / Airline surge handling
+    // 4. SCENARIO 4: Fare Spike / Airline surge handling
     if (lower.includes('spike') || lower.includes('too expensive') || lower.includes('fare surged')) {
       await this.handlePriceSpikeReaction(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // 3. SCENARIO 3: Destination Change (e.g. to Kochi)
+    // 5. SCENARIO 3: Destination Change (e.g. to Kochi)
     if (lower.includes('kochi') || lower.includes('cochin') || lower.includes('change destination')) {
       await this.handleDestinationChange(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // 4. SCENARIO 2: Baggage & Cancellation Policy Query
+    // 6. SCENARIO 2: Baggage & Cancellation Policy Query
     if (
       lower.includes('baggage') ||
       lower.includes('check-in') ||
@@ -175,34 +301,66 @@ export class VoiceAgentOrchestrator {
       return;
     }
 
-    // 5. Booking Confirmation / Lock Seat consent
+    // 7. Booking Confirmation / Lock Seat consent
     if (
       lower.includes('book') ||
       lower.includes('lock') ||
       lower.includes('yes') ||
+      lower.includes('haan') ||
       lower.includes('sounds good') ||
       lower.includes("let's do it") ||
       lower.includes('confirm') ||
       lower.includes('proceed')
     ) {
+      if (!this.context.passengerName) {
+        const resp = "Great! What is the passenger's full name to book the ticket?";
+        this.appendMessage({
+          id: `agent-${Date.now()}`,
+          role: 'agent',
+          text: resp,
+          timestamp: new Date().toLocaleTimeString(),
+          intentDetected: 'SOLICIT_PASSENGER_NAME',
+        });
+        if (voiceTrigger) speechService.speak(resp);
+        this.isProcessing = false;
+        return;
+      }
+
       await this.handleSeatLockAndPaymentInitiation(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // 6. Cancellation or Modification query
+    // 8. Cancellation or Modification query
     if (lower.includes('cancel my flight') || lower.includes('cancel booking') || lower.includes('modify')) {
       await this.handleBookingCancellation(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // DEFAULT / SCENARIO 1: Primary Intent & Travel Search (Bangalore -> Goa, ₹8k budget)
+    // DEFAULT / NATURAL TRAVEL DISCOVERY
     await this.handlePrimarySearchIntent(text, startTime, voiceTrigger);
     this.isProcessing = false;
   }
 
-  // --- HANDLER 1: PRIMARY DISCOVERY & MULTI-MODAL SEARCH (FLIGHT, TRAIN, BUS) ---
+  // Helper when user provides passenger name
+  private async handleNameProvidedAndConfirmHold(name: string, startTime: number, voiceTrigger: boolean) {
+    const opt = this.context.selectedOption || this.context.options[0];
+    const totalLatency = Math.round(performance.now() - startTime);
+
+    const resp = `Berth locked for ${name}! Should I send the UPI payment request of ₹${opt?.price || 1280} to your Google Pay or PhonePe?`;
+    this.appendMessage({
+      id: `agent-${Date.now()}`,
+      role: 'agent',
+      text: resp,
+      timestamp: new Date().toLocaleTimeString(),
+      intentDetected: 'PASSENGER_NAME_CAPTURED_CONFIRM_PAYMENT',
+      latencyMs: totalLatency,
+    });
+    if (voiceTrigger) speechService.speak(resp);
+  }
+
+  // --- HANDLER 1: PRIMARY DISCOVERY & MULTI-MODAL SEARCH ---
   private async handlePrimarySearchIntent(rawText: string, startTime: number, voiceTrigger: boolean) {
     const lower = rawText.toLowerCase();
 
@@ -239,51 +397,50 @@ export class VoiceAgentOrchestrator {
       this.context.modePreference = 'bus';
     } else if (lower.includes('flight') || lower.includes('plane') || lower.includes('fly')) {
       this.context.modePreference = 'flight';
+    } else if (lower.includes('hotel') || lower.includes('resort')) {
+      this.context.modePreference = 'hotel';
     }
 
     // Extract Budget if explicitly stated by user
+    const budgetMatch = rawText.match(
+      /(?:budget|around|under|₹|rs\.?|inr)?\s*(\d{1,2}(?:,\d{3})+|\d+)\s*(?:k|thousand|rupees)?/i
+    );
     if (lower.includes('8000') || lower.includes('8k') || lower.includes('₹8,000')) {
       this.context.budget = 8000;
-    } else {
-      const budgetMatch = rawText.match(
-        /(?:budget|around|under|₹|rs\.?|inr)?\s*(\d{1,2}(?:,\d{3})+|\d+)\s*(?:k|thousand|rupees)?/i
-      );
-      if (budgetMatch) {
-        const parsed = parseInt(budgetMatch[1].replace(/,/g, ''), 10);
-        if (parsed >= 500) {
-          this.context.budget = parsed;
-        }
+    } else if (budgetMatch) {
+      const parsed = parseInt(budgetMatch[1].replace(/,/g, ''), 10);
+      if (parsed >= 500) {
+        this.context.budget = parsed;
       }
     }
 
-    // 2. DISCOVERY CASE A: User ONLY specified destination (e.g. "goa" or "i want to visit goa")
-    // Date, budget, and travel mode are MISSING!
+    // 2. User ONLY specified destination (e.g. "Goa") -> Natural, short human question!
     if (
       this.context.destination &&
       !this.context.date &&
       !this.context.budget &&
       !lower.includes('flight') &&
       !lower.includes('bus') &&
-      !lower.includes('train')
+      !lower.includes('train') &&
+      !lower.includes('hotel')
     ) {
       const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `${this.context.destination} is a wonderful choice! When are you planning to travel, and do you prefer flying, taking a scenic train (like the Vasco Express), or an overnight sleeper bus? Let me know if you have a budget in mind so I can filter the best options for you.`;
+      const agentResponse = `Great, ${this.context.destination}! Are you looking for a Flight, Train, or Sleeper Bus?`;
 
-      const agentMsg: Message = {
+      this.appendMessage({
         id: `agent-${Date.now()}`,
         role: 'agent',
         text: agentResponse,
         timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'SLOT_DISCOVERY_MISSING_DATE_MODE_BUDGET',
+        intentDetected: 'SLOT_DISCOVERY_MODE_QUERY',
         latencyMs: totalLatency,
-      };
+      });
 
-      this.appendMessage(agentMsg);
       if (voiceTrigger) speechService.speak(agentResponse);
       return;
     }
 
-    // 3. User specifically asked for Train
+    // 3. User specifically asked for Train -> Show train classes (Sleeper, 3AC, 2AC)!
     if (this.context.modePreference === 'train' || (lower.includes('train') && !lower.includes('flight'))) {
       this.context.step = 'discovering';
       this.onStateChange({ ...this.context });
@@ -299,29 +456,28 @@ export class VoiceAgentOrchestrator {
       this.context.step = 'options_presented';
 
       const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `For trains from Bangalore to Goa, we have the direct **17309 Vasco Da Gama Express** departing KSR City Station at 2:30 PM, reaching Madgaon at 11:10 PM. Total fare is **₹1,280** for a 3AC Sleeper berth, including 40 kg baggage. Would you like me to reserve a berth for you?`;
+      const agentResponse = `For Bangalore to Goa, the Vasco Express has Sleeper (₹420), 3AC (₹1,280), and 2AC (₹1,850). Which class would you like?`;
 
-      const agentMsg: Message = {
+      this.appendMessage({
         id: `agent-${Date.now()}`,
         role: 'agent',
         text: agentResponse,
         timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'TRAIN_SCHEDULE_RECOMMENDATION',
+        intentDetected: 'TRAIN_CLASSES_OFFERED',
         toolCall: {
           name: 'search_train_inventory',
-          params: { trainNo: '17309', route: 'SBC-MAO', class: '3A', fare: 1280 },
-          resultSummary: 'IRCTC 17309 Vasco Express 3AC confirmed available at ₹1,280',
+          params: { trainNo: '17309', classes: ['SL', '3A', '2A'] },
+          resultSummary: 'IRCTC 17309 Vasco Express Sleeper (₹420), 3AC (₹1,280), 2AC (₹1,850)',
           durationMs: searchLatencyMs,
         },
         latencyMs: totalLatency,
-      };
+      });
 
-      this.appendMessage(agentMsg);
       if (voiceTrigger) speechService.speak(agentResponse);
       return;
     }
 
-    // 4. User specifically asked for Bus
+    // 4. User specifically asked for Bus -> Show bus classes (AC Sleeper vs Semi-Sleeper)!
     if (this.context.modePreference === 'bus' || (lower.includes('bus') && !lower.includes('flight'))) {
       this.context.step = 'discovering';
       this.onStateChange({ ...this.context });
@@ -337,29 +493,65 @@ export class VoiceAgentOrchestrator {
       this.context.step = 'options_presented';
 
       const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `For buses to Goa, we have the **IntrCity SmartBus Premium AC Sleeper** departing Indiranagar at 9:30 PM Thursday night, arriving Panjim at 8:00 AM Friday for **₹2,200**. It includes 20 kg luggage storage. Would you like me to lock a sleeper berth?`;
+      const agentResponse = `For buses, we have an AC Sleeper for ₹2,200 or a Volvo Semi-Sleeper for ₹1,450. Which one works better for you?`;
 
-      const agentMsg: Message = {
+      this.appendMessage({
         id: `agent-${Date.now()}`,
         role: 'agent',
         text: agentResponse,
         timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'BUS_SCHEDULE_RECOMMENDATION',
+        intentDetected: 'BUS_CLASSES_OFFERED',
         toolCall: {
           name: 'search_bus_inventory',
-          params: { route: 'BLR-GOA', type: 'AC_SLEEPER', fare: 2200 },
-          resultSummary: 'IntrCity SmartBus AC Sleeper confirmed available at ₹2,200',
+          params: { route: 'BLR-GOA', classes: ['AC_SLEEPER', 'SEMI_SLEEPER'] },
+          resultSummary: 'IntrCity Sleeper (₹2,200) & Zingbus Volvo (₹1,450)',
           durationMs: searchLatencyMs,
         },
         latencyMs: totalLatency,
-      };
+      });
 
-      this.appendMessage(agentMsg);
       if (voiceTrigger) speechService.speak(agentResponse);
       return;
     }
 
-    // 5. Multi-modal Search across Flight, Train, and Bus!
+    // 5. User specifically asked for Flight -> Short, punchy response!
+    if (this.context.modePreference === 'flight' || lower.includes('flight')) {
+      this.context.step = 'discovering';
+      this.onStateChange({ ...this.context });
+      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
+        'BLR',
+        this.context.destination || 'GOA',
+        this.context.date || 'Next Friday',
+        null,
+        'flight'
+      );
+      this.context.options = options;
+      this.context.selectedOption = options[0];
+      this.context.step = 'options_presented';
+
+      const totalLatency = Math.round(performance.now() - startTime);
+      const agentResponse = `IndiGo non-stop at 11:15 AM is ₹5,400 with 15 kg check-in baggage. Shall I book this for you?`;
+
+      this.appendMessage({
+        id: `agent-${Date.now()}`,
+        role: 'agent',
+        text: agentResponse,
+        timestamp: new Date().toLocaleTimeString(),
+        intentDetected: 'FLIGHT_OFFERED',
+        toolCall: {
+          name: 'search_flight_inventory',
+          params: { route: 'BLR-GOA', flight: '6E-512', fare: 5400 },
+          resultSummary: 'IndiGo 6E-512 non-stop confirmed at ₹5,400',
+          durationMs: searchLatencyMs,
+        },
+        latencyMs: totalLatency,
+      });
+
+      if (voiceTrigger) speechService.speak(agentResponse);
+      return;
+    }
+
+    // 6. Multi-modal Search across Flight, Train, and Bus
     this.context.step = 'discovering';
     this.onStateChange({ ...this.context });
 
@@ -372,67 +564,31 @@ export class VoiceAgentOrchestrator {
       targetDest,
       targetDate,
       this.context.budget,
-      null // search all modes: flight, train, bus
+      null
     );
 
     this.context.options = options;
-    this.context.selectedOption = options[0]; // IndiGo 6E-512 as top flight recommendation
+    this.context.selectedOption = options[0];
     this.context.step = 'options_presented';
 
     const toolDuration = Math.round(performance.now() - searchToolStart);
     const totalLatency = Math.round(performance.now() - startTime);
 
-    this.context.telemetry = {
-      ...this.context.telemetry,
-      totalLatencyMs: totalLatency,
-      apiToolLatencyMs: toolDuration,
-      groundingStatus: 'VERIFIED_API',
-    };
-
     let agentResponse = '';
-
-    // If budget was explicitly stated:
     if (this.context.budget) {
-      agentResponse =
-        `I've reviewed live schedules for ${targetDest} next Friday within your ₹${this.context.budget} budget across flight, train, and bus:\n\n` +
-        `1. **IndiGo Flight 6E-512**: Departs Kempegowda at 11:15 AM, reaching Mopa Goa in 1h 15m at **₹5,400** (well under your ₹${this.context.budget} budget).\n` +
-        `2. **IntrCity SmartBus Sleeper**: Departs Indiranagar at 9:30 PM Thursday night, arriving 8:00 AM Friday for **₹2,200**.\n` +
-        `3. **Vasco Express Train (17309)**: Direct 3AC Sleeper at **₹1,280** with 40 kg baggage.\n\n` +
-        `Given your focus on convenience and saving time, the IndiGo flight is the smoothest option. Would you like me to lock this seat for you?`;
+      agentResponse = `Here are the best options for Goa next Friday under ₹${this.context.budget}: IndiGo flight at ₹5,400, or the Vasco Express train at ₹1,280. Which one do you prefer?`;
     } else {
-      // If NO budget was stated: Do NOT hallucinate ₹8,000! Present all 3 choices clearly.
-      agentResponse =
-        `I've pulled up live options across flight, train, and bus for Goa next Friday:\n\n` +
-        `1. **Flight (IndiGo 6E-512)**: Non-stop in 1h 15m at **₹5,400** (fastest & most convenient).\n` +
-        `2. **Bus (IntrCity SmartBus)**: Overnight AC Sleeper at **₹2,200** (saves hotel stay).\n` +
-        `3. **Train (IRCTC Vasco Express 17309)**: Direct 3AC Sleeper at **₹1,280** with 40 kg free baggage.\n\n` +
-        `Which mode do you prefer, or do you have a specific budget you'd like to stay under?`;
+      agentResponse = `For Goa next Friday, we have flights from ₹5,400, trains from ₹420, and sleeper buses from ₹1,450. Which mode do you prefer?`;
     }
 
-    const agentMsg: Message = {
+    this.appendMessage({
       id: `agent-${Date.now()}`,
       role: 'agent',
       text: agentResponse,
       timestamp: new Date().toLocaleTimeString(),
-      intentDetected: this.context.budget
-        ? 'BUDGET_CURATED_OPTIONS'
-        : 'MULTI_MODAL_DISCOVERY_FLIGHT_TRAIN_BUS',
-      toolCall: {
-        name: 'search_transport_options',
-        params: {
-          origin: 'BLR',
-          destination: targetDest,
-          date: targetDate,
-          budget: this.context.budget || 'UNCONSTRAINED',
-          modes: ['flight', 'train', 'bus'],
-        },
-        resultSummary: `Returned ${options.length} verified multi-modal options via GDS & IRCTC APIs`,
-        durationMs: searchLatencyMs,
-      },
+      intentDetected: 'MULTI_MODAL_SHORT_COMPARISON',
       latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
+    });
 
     if (voiceTrigger) {
       speechService.speak(agentResponse);
@@ -517,23 +673,40 @@ export class VoiceAgentOrchestrator {
     const option = this.context.selectedOption || this.context.options[0];
     if (!option) return;
 
+    const passengerName = this.context.passengerName || 'Traveler';
+    const upiHandle = `${passengerName.toLowerCase().replace(/\s+/g, '')}@okhdfcbank`;
+    const passenger: PassengerDetails = {
+      id: `usr-${Date.now()}`,
+      name: passengerName,
+      phone: '+91 98450 12345',
+      email: `${passengerName.toLowerCase().replace(/\s+/g, '')}@example.com`,
+      upiId: upiHandle,
+      seatPreference:
+        option.mode === 'train'
+          ? 'Berth 34 (Lower, 3AC)'
+          : option.mode === 'bus'
+          ? 'Upper Berth U4'
+          : option.mode === 'hotel'
+          ? 'Deluxe Balcony Room'
+          : '12F (Window)',
+    };
+
     this.context.step = 'seat_locked';
-    const hold = await travelEngine.lockFareAndHoldPNR(option.id, DEFAULT_PASSENGER);
+    const hold = await travelEngine.lockFareAndHoldPNR(option.id, passenger);
     this.context.hold = hold;
     this.onStateChange({ ...this.context });
 
     // Initiate out-of-band UPI push
-    const txn = await paymentEngine.initiateUpiPush(hold.orderId, hold.amount, DEFAULT_PASSENGER.upiId);
+    const txn = await paymentEngine.initiateUpiPush(hold.orderId, hold.amount, upiHandle);
     this.context.transaction = txn;
     this.context.step = 'payment_pushed';
 
     const totalLatency = Math.round(performance.now() - startTime);
 
     const agentResponse =
-      `I've placed a temporary 10-minute hold on seat 12F at **₹${hold.amount}**. ` +
-      `For your security, we never ask for card numbers, OTPs, or UPI PINs over voice. ` +
-      `I have sent an instant UPI payment request of ₹${hold.amount} directly to your Google Pay app (${DEFAULT_PASSENGER.upiId}) ` +
-      `and via SMS. Please open your payment app and approve the request.`;
+      `I've placed a 10-minute hold for **${passengerName}** at **₹${hold.amount}**. ` +
+      `I have sent an instant UPI payment request of ₹${hold.amount} to your UPI ID (${upiHandle}). ` +
+      `Please open Google Pay or PhonePe to approve the payment.`;
 
     const agentMsg: Message = {
       id: `agent-${Date.now()}`,
@@ -543,8 +716,8 @@ export class VoiceAgentOrchestrator {
       intentDetected: 'SEAT_LOCK_AND_OUT_OF_BAND_PAYMENT',
       toolCall: {
         name: 'lock_fare_and_hold_pnr',
-        params: { orderId: hold.orderId, amount: hold.amount, upiVpa: DEFAULT_PASSENGER.upiId },
-        resultSummary: `Seat held for 10m. Push dispatched to ${DEFAULT_PASSENGER.upiId}`,
+        params: { orderId: hold.orderId, amount: hold.amount, passenger: passengerName, upiVpa: upiHandle },
+        resultSummary: `10m hold active for ${passengerName}. UPI push sent to ${upiHandle}`,
         durationMs: 320,
       },
       latencyMs: totalLatency,
@@ -571,10 +744,10 @@ export class VoiceAgentOrchestrator {
       this.context.hold.status = 'paid';
     }
 
+    const passengerName = this.context.passengerName || 'Traveler';
     const agentResponse =
-      `Payment received! Your IndiGo flight to Goa is confirmed. Your PNR is **${pnr}**. ` +
-      `I have dispatched your boarding pass and invoice to your WhatsApp (+91 98450 12345) and email. ` +
-      `Have a wonderful trip to Goa!`;
+      `Payment received! Your ${this.context.selectedOption?.mode || 'ticket'} is confirmed for **${passengerName}**. ` +
+      `Your PNR is **${pnr}**. E-ticket sent to your WhatsApp. Have a wonderful journey!`;
 
     const agentMsg: Message = {
       id: `agent-${Date.now()}`,
@@ -583,9 +756,9 @@ export class VoiceAgentOrchestrator {
       timestamp: new Date().toLocaleTimeString(),
       intentDetected: 'PAYMENT_CAPTURED_AND_TICKET_ISSUED',
       toolCall: {
-        name: 'issue_airline_ticket',
-        params: { orderId: this.context.hold?.orderId, pnr },
-        resultSummary: 'GDS PNR Issued & WhatsApp confirmation sent',
+        name: 'issue_ticket_pnr',
+        params: { orderId: this.context.hold?.orderId, pnr, passenger: passengerName },
+        resultSummary: `Ticket confirmed: PNR ${pnr} issued for ${passengerName}`,
         durationMs: 410,
       },
       latencyMs: 410,
@@ -613,12 +786,11 @@ export class VoiceAgentOrchestrator {
     }
 
     const totalLatency = Math.round(performance.now() - startTime);
+    const passengerName = this.context.passengerName || 'Traveler';
 
     const agentResponse =
-      `Don't worry, Rahul. I ran an instant 3-way check across our payment gateway, ledger, and IndiGo reservation system. ` +
-      `The payment of ₹5,400 was captured successfully, and the airline hold was active. ` +
-      `I have finalized your reservation right now. Your confirmed PNR is **${audit.pnr}**. ` +
-      `The e-ticket has been sent to your WhatsApp and email!`;
+      `Don't worry, ${passengerName}! I ran an instant 3-way check across our payment gateway, bank ledger, and reservation desk. ` +
+      `The payment was captured, and your ticket is confirmed! Your PNR is **${audit.pnr}**. Have a safe trip!`;
 
     const agentMsg: Message = {
       id: `agent-${Date.now()}`,
@@ -651,8 +823,9 @@ export class VoiceAgentOrchestrator {
 
     const totalLatency = Math.round(performance.now() - startTime);
 
+    const passengerName = this.context.passengerName || 'Traveler';
     const agentResponse =
-      `Rahul, before I lock that seat: the airline just updated the fare from ₹5,400 to **₹8,600**, which exceeds your ₹8,000 budget. ` +
+      `Before I lock that seat: the airline just updated the fare from ₹5,400 to **₹8,600**, which exceeds your ₹8,000 budget. ` +
       `However, there is another direct flight on **Akasa Air (QP-1344)** at 2:30 PM for **₹5,100**. ` +
       `Would you prefer the 2:30 PM Akasa flight, or should we stick with IndiGo at ₹8,600?`;
 

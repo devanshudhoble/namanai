@@ -2,14 +2,12 @@ import React from 'react';
 import { Sparkles, ShieldCheck, Zap, Sliders, BarChart3, RotateCcw, Headphones, Compass } from 'lucide-react';
 
 interface HeaderProps {
-  onOpenAnalytics: () => void;
   onOpenSettings: () => void;
   onReset: () => void;
   latencyMs: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
-  onOpenAnalytics,
   onOpenSettings,
   onReset,
 }) => {
@@ -66,21 +64,13 @@ export const Header: React.FC<HeaderProps> = ({
             title="Start New Travel Search"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">New Search</span>
-          </button>
-
-          <button
-            onClick={onOpenAnalytics}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-bold transition cursor-pointer shadow-xs"
-          >
-            <BarChart3 className="w-3.5 h-3.5 text-blue-600" />
-            <span>Pillar Analytics</span>
+            <span>New Search</span>
           </button>
 
           <button
             onClick={onOpenSettings}
             className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
-            title="API Integrations & Keys"
+            title="API Integrations & Settings"
           >
             <Sliders className="w-4 h-4" />
           </button>
