@@ -91,15 +91,11 @@ export function App() {
   };
 
   const handleSelectOption = (opt: TravelOption) => {
-    if (context) {
-      context.selectedOption = opt;
-      setContext({ ...context });
-      orchestratorRef.current?.handleSeatLockAndPaymentInitiation();
-    }
+    orchestratorRef.current?.handleSelectOptionExplicitly(opt);
   };
 
   const handleApprovePayment = () => {
-    orchestratorRef.current?.completePaymentSuccess(true);
+    orchestratorRef.current?.handleSimulatedPaymentApproval();
   };
 
   const handleSimulateDeductionPending = () => {
@@ -158,28 +154,28 @@ export function App() {
           {/* Quick Travel Mode Shortcuts */}
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
-              onClick={() => handleSendMessage('Show me flights to Goa')}
+              onClick={() => handleSendMessage('I want to book a flight')}
               className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs text-white"
             >
               <Plane className="w-3.5 h-3.5 text-cyan-200" />
               <span>Flights</span>
             </button>
             <button
-              onClick={() => handleSendMessage('Show me train options')}
+              onClick={() => handleSendMessage('I want to travel by train')}
               className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs text-white"
             >
               <Train className="w-3.5 h-3.5 text-amber-200" />
               <span>Trains</span>
             </button>
             <button
-              onClick={() => handleSendMessage('Show me sleeper bus')}
+              onClick={() => handleSendMessage('Show me sleeper bus options')}
               className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs text-white"
             >
               <Bus className="w-3.5 h-3.5 text-emerald-200" />
               <span>Buses</span>
             </button>
             <button
-              onClick={() => handleSendMessage('Show me hotels in Goa')}
+              onClick={() => handleSendMessage('I need a hotel booking')}
               className="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-xs font-bold transition flex items-center space-x-1.5 cursor-pointer backdrop-blur-xs text-white"
             >
               <Hotel className="w-3.5 h-3.5 text-purple-200" />
@@ -217,6 +213,10 @@ export function App() {
               hold={context.hold}
               transaction={context.transaction}
               step={context.step}
+              origin={context.origin}
+              destination={context.destination}
+              date={context.date}
+              passengersCount={context.passengersCount}
               onSelectOption={handleSelectOption}
               onApprovePayment={handleApprovePayment}
               onSimulateDeductionPending={handleSimulateDeductionPending}

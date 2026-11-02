@@ -10,16 +10,19 @@ import {
 import { travelEngine } from './travelEngine';
 import { paymentEngine } from './paymentEngine';
 import { speechService } from './speechService';
-import { DEFAULT_PASSENGER } from '../data/travelDatabase';
 import { contextHarness } from './contextHarness';
 
 export interface AgentContext {
   origin: string;
   destination: string;
   date: string;
+  tripType: 'one-way' | 'return' | null;
+  returnDate: string | null;
+  passengersCount: number;
   budget: number | null;
   modePreference: 'flight' | 'train' | 'bus' | 'hotel' | 'all' | null;
   selectedClass: string | null;
+  preferencesNote: string | null;
   passengerName: string;
   preference: string;
   options: TravelOption[];
@@ -29,6 +32,76 @@ export interface AgentContext {
   step: AgentStateStep;
   messages: Message[];
   telemetry: TelemetryMetrics;
+  waitingForApproval: boolean;
+  preferencesAsked: boolean;
+}
+
+const KNOWN_INDIAN_CITIES = [
+  'nagpur', 'mumbai', 'delhi', 'bengaluru', 'bangalore', 'pune', 'hyderabad', 'chennai',
+  'kolkata', 'ahmedabad', 'jaipur', 'lucknow', 'chandigarh', 'varanasi', 'bhopal',
+  'indore', 'patna', 'surat', 'kochi', 'cochin', 'goa', 'amritsar', 'manali', 'shimla',
+  'dehradun', 'ayodhya', 'shirdi', 'haridwar', 'rishikesh', 'udaipur', 'jodhpur', 'agra',
+  'vadodara', 'coimbatore', 'visakhapatnam', 'vizag', 'ranchi', 'raipur', 'guwahati',
+  'bhubaneswar', 'wardha', 'amravati', 'solapur', 'nashik', 'latur', 'nanded', 'kolhapur'
+];
+
+function extractCityFromText(text: string): { destination?: string; origin?: string } {
+  const lower = text.toLowerCase();
+  let destination: string | undefined;
+  let origin: string | undefined;
+
+  // Pattern: "from X to Y" or "X to Y" or "X se Y"
+  const fromToMatch = text.match(/(?:from|se)\s+([A-Za-z]+)\s+(?:to|tak)\s+([A-Za-z]+)/i);
+  if (fromToMatch) {
+    origin = capitalize(fromToMatch[1]);
+    destination = capitalize(fromToMatch[2]);
+    return { origin, destination };
+  }
+
+  const directToMatch = text.match(/([A-Za-z]+)\s+(?:to|se)\s+([A-Za-z]+)/i);
+  if (directToMatch && KNOWN_INDIAN_CITIES.includes(directToMatch[1].toLowerCase()) && KNOWN_INDIAN_CITIES.includes(directToMatch[2].toLowerCase())) {
+    origin = capitalize(directToMatch[1]);
+    destination = capitalize(directToMatch[2]);
+    return { origin, destination };
+  }
+
+  // Pattern: "to [City]" or "for [City]" or "visit [City]" or "[City] jana hai"
+  const toMatch = text.match(/(?:to|for|reach|visit|in)\s+([A-Za-z]+)/i);
+  if (toMatch) {
+    destination = capitalize(toMatch[1]);
+  }
+
+  const fromMatch = text.match(/(?:from|starting from|leaving from|origin)\s+([A-Za-z]+)/i);
+  if (fromMatch) {
+    origin = capitalize(fromMatch[1]);
+  }
+
+  const janaHaiMatch = text.match(/([A-Za-z]+)\s+(?:jana|ghoomne|pahunchna)/i);
+  if (janaHaiMatch && !destination) {
+    destination = capitalize(janaHaiMatch[1]);
+  }
+
+  const seMatch = text.match(/([A-Za-z]+)\s+se\b/i);
+  if (seMatch && !origin) {
+    origin = capitalize(seMatch[1]);
+  }
+
+  // Match known Indian cities directly in text
+  for (const city of KNOWN_INDIAN_CITIES) {
+    if (lower.includes(city)) {
+      const cap = capitalize(city);
+      if (!destination && !origin) {
+        destination = cap;
+      }
+    }
+  }
+
+  return { destination, origin };
+}
+
+function capitalize(s: string): string {
+  if (!s) return '';
+  return s.trim().charAt(0).toUpperCase() + s.trim().slice(1).toLowerCase();
 }
 
 export class VoiceAgentOrchestrator {
@@ -43,12 +116,16 @@ export class VoiceAgentOrchestrator {
 
   private getInitialContext(): AgentContext {
     return {
-      origin: 'Bengaluru',
+      origin: '',
       destination: '',
       date: '',
+      tripType: null,
+      returnDate: null,
+      passengersCount: 0,
       budget: null,
-      modePreference: 'all',
+      modePreference: null,
       selectedClass: null,
+      preferencesNote: null,
       passengerName: '',
       preference: 'Convenience',
       options: [],
@@ -56,21 +133,23 @@ export class VoiceAgentOrchestrator {
       hold: null,
       transaction: null,
       step: 'idle',
+      waitingForApproval: false,
+      preferencesAsked: false,
       messages: [
         {
           id: 'msg-welcome',
           role: 'agent',
-          text: 'Namaste! Where would you like to travel?',
+          text: 'Namaste! Where would you like to travel today?',
           timestamp: new Date().toLocaleTimeString(),
           isSpoken: true,
         },
       ],
       telemetry: {
         totalLatencyMs: 0,
-        sttLatencyMs: 280,
-        llmReasoningMs: 340,
-        apiToolLatencyMs: 190,
-        ttsTtfbMs: 210,
+        sttLatencyMs: 240,
+        llmReasoningMs: 290,
+        apiToolLatencyMs: 180,
+        ttsTtfbMs: 190,
         hesitationDetected: false,
         hesitationDurationSec: 0,
         hallucinationRate: '0.0% (Strict API Grounding)',
@@ -96,7 +175,7 @@ export class VoiceAgentOrchestrator {
     this.appendMessage({
       id: `int-${Date.now()}`,
       role: 'system',
-      text: '⚡ Barge-in detected: Agent speech cancelled. Listening to traveler...',
+      text: '⚡ Barge-in: Listening to traveler...',
       timestamp: new Date().toLocaleTimeString(),
     });
   }
@@ -109,8 +188,6 @@ export class VoiceAgentOrchestrator {
   public async handleUserUtterance(text: string, voiceTrigger: boolean = true) {
     if (this.isProcessing || !text.trim()) return;
     this.isProcessing = true;
-
-    // Stop agent speech if still speaking
     speechService.stopSpeaking();
 
     const startTime = performance.now();
@@ -124,7 +201,7 @@ export class VoiceAgentOrchestrator {
 
     const lower = text.toLowerCase();
 
-    // Context Harness Security & Credential Leak Guardrail
+    // Context Harness Security Guardrail
     const safety = contextHarness.sanitizeUserUtterance(text);
     if (!safety.isSafe) {
       this.appendMessage({
@@ -139,541 +216,385 @@ export class VoiceAgentOrchestrator {
       return;
     }
 
-    // 0. Dynamic Passenger Name Handling (User answering "What is the passenger name?")
-    const nameMatch = text.match(/(?:my name is|name is|i am|for|passenger is)\s+([A-Za-z\s]+)/i);
-    const words = text.trim().split(/\s+/);
-    const isSingleOrDoubleWordName = words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'kochi', '3ac', '2ac', 'sleeper'].includes(lower);
-
+    // SCENARIO: Payment Deducted / Ticket Pending Exception Recovery
     if (
-      this.context.selectedOption &&
-      !this.context.passengerName &&
-      (nameMatch || isSingleOrDoubleWordName)
-    ) {
-      const capturedName = (nameMatch ? nameMatch[1] : text).trim();
-      if (capturedName.length >= 2) {
-        this.context.passengerName = capturedName;
-        await this.handleNameProvidedAndConfirmHold(capturedName, startTime, voiceTrigger);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    // 1. Train Class Selection (Sleeper, 3AC, 2AC)
-    if (lower.includes('3ac') || lower.includes('3 ac') || lower.includes('third ac')) {
-      const train3ac = this.context.options.find((o) => o.id === 'opt-irctc-train-17309') || this.context.options[0];
-      if (train3ac) {
-        this.context.selectedOption = train3ac;
-        this.context.selectedClass = '3AC';
-        this.onStateChange({ ...this.context });
-        const resp = `Selected 3AC Sleeper at ₹1,280. What is the passenger's full name to book the ticket?`;
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'TRAIN_CLASS_3AC_SELECTED',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    if (lower.includes('2ac') || lower.includes('2 ac') || lower.includes('second ac')) {
-      const train2ac = this.context.options.find((o) => o.id === 'opt-irctc-train-2ac') || this.context.options[0];
-      if (train2ac) {
-        this.context.selectedOption = train2ac;
-        this.context.selectedClass = '2AC';
-        this.onStateChange({ ...this.context });
-        const resp = `Selected 2AC Comfort Sleeper at ₹1,850. What is the passenger's full name to book the ticket?`;
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'TRAIN_CLASS_2AC_SELECTED',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    if (lower.includes('sleeper') && !lower.includes('bus')) {
-      const trainSL = this.context.options.find((o) => o.id === 'opt-irctc-train-sleeper') || this.context.options[0];
-      if (trainSL) {
-        this.context.selectedOption = trainSL;
-        this.context.selectedClass = 'Sleeper';
-        this.onStateChange({ ...this.context });
-        const resp = `Selected Sleeper class at ₹420. What is the passenger's full name to book the ticket?`;
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'TRAIN_CLASS_SLEEPER_SELECTED',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    // 2. Bus Class Selection (AC Sleeper vs Semi-Sleeper)
-    if (lower.includes('semi sleeper') || lower.includes('semi-sleeper')) {
-      const busSemi = this.context.options.find((o) => o.id === 'opt-zingbus-semi-sleeper') || this.context.options[0];
-      if (busSemi) {
-        this.context.selectedOption = busSemi;
-        this.context.selectedClass = 'Semi-Sleeper';
-        this.onStateChange({ ...this.context });
-        const resp = `Selected Volvo Semi-Sleeper at ₹1,450. What is the passenger's full name for the bus ticket?`;
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'BUS_SEMI_SLEEPER_SELECTED',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    if (lower.includes('ac sleeper') || lower.includes('sleeper bus')) {
-      const busSleeper = this.context.options.find((o) => o.id === 'opt-smartbus-sleeper') || this.context.options[0];
-      if (busSleeper) {
-        this.context.selectedOption = busSleeper;
-        this.context.selectedClass = 'AC Sleeper';
-        this.onStateChange({ ...this.context });
-        const resp = `Selected BharatBenz AC Sleeper at ₹2,200. What is the passenger's full name for the bus ticket?`;
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'BUS_AC_SLEEPER_SELECTED',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    // 3. SCENARIO 5: Payment Deducted / Ticket Pending Exception Recovery
-    if (
-      lower.includes('money has been deducted') ||
-      lower.includes('money was deducted') ||
       lower.includes('deducted') ||
+      lower.includes('cut gaya') ||
+      lower.includes('kat gaye') ||
       lower.includes('not confirmed') ||
-      lower.includes('ticket is not confirmed') ||
-      lower.includes('ticket pending')
+      lower.includes('ticket pending') ||
+      lower.includes('paise cut')
     ) {
       await this.handlePaymentDeductedException(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // 4. SCENARIO 4: Fare Spike / Airline surge handling
-    if (lower.includes('spike') || lower.includes('too expensive') || lower.includes('fare surged')) {
-      await this.handlePriceSpikeReaction(startTime, voiceTrigger);
-      this.isProcessing = false;
-      return;
-    }
-
-    // 5. SCENARIO 3: Destination Change (e.g. to Kochi)
-    if (lower.includes('kochi') || lower.includes('cochin') || lower.includes('change destination')) {
-      await this.handleDestinationChange(startTime, voiceTrigger);
-      this.isProcessing = false;
-      return;
-    }
-
-    // 6. SCENARIO 2: Baggage & Cancellation Policy Query
+    // SCENARIO: Baggage or Cancellation Policy Query
     if (
       lower.includes('baggage') ||
       lower.includes('check-in') ||
       lower.includes('luggage') ||
       lower.includes('cancellation') ||
-      lower.includes('refund')
+      lower.includes('refund') ||
+      lower.includes('rules')
     ) {
       await this.handleBaggageAndCancellationQuery(startTime, voiceTrigger);
       this.isProcessing = false;
       return;
     }
 
-    // 7. Booking Confirmation / Lock Seat consent
-    if (
-      lower.includes('book') ||
-      lower.includes('lock') ||
-      lower.includes('yes') ||
-      lower.includes('haan') ||
-      lower.includes('sounds good') ||
-      lower.includes("let's do it") ||
-      lower.includes('confirm') ||
-      lower.includes('proceed')
-    ) {
-      if (!this.context.passengerName) {
-        const resp = "Great! What is the passenger's full name to book the ticket?";
+    // SCENARIO: Passenger Name Provided (after approval was granted)
+    const nameMatch = text.match(/(?:my name is|name is|i am|for|passenger is|traveler is)\s+([A-Za-z\s]+)/i);
+    const words = text.trim().split(/\s+/);
+    const isNameAnswer =
+      this.context.waitingForApproval &&
+      !this.context.passengerName &&
+      (nameMatch || (words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'nagpur', '3ac', '2ac', 'sleeper', 'haan', 'theek hai'].includes(lower)));
+
+    if (isNameAnswer) {
+      const capturedName = (nameMatch ? nameMatch[1] : text).trim();
+      if (capturedName.length >= 2) {
+        this.context.passengerName = capturedName;
+        await this.handleExecuteSeatLockAndUpiPush(capturedName, startTime, voiceTrigger);
+        this.isProcessing = false;
+        return;
+      }
+    }
+
+    // SCENARIO: Explicit Customer Booking Approval
+    if (this.context.waitingForApproval) {
+      if (
+        lower.includes('yes') ||
+        lower.includes('proceed') ||
+        lower.includes('confirm') ||
+        lower.includes('book') ||
+        lower.includes('haan') ||
+        lower.includes('sure') ||
+        lower.includes('kardo') ||
+        lower.includes('do it') ||
+        lower.includes('ok') ||
+        lower.includes('okay')
+      ) {
+        if (!this.context.passengerName) {
+          const resp = "Great! What is the primary passenger's full name for the ticket?";
+          this.appendMessage({
+            id: `agent-${Date.now()}`,
+            role: 'agent',
+            text: resp,
+            timestamp: new Date().toLocaleTimeString(),
+            intentDetected: 'SOLICIT_PASSENGER_NAME',
+          });
+          if (voiceTrigger) speechService.speak(resp);
+          this.isProcessing = false;
+          return;
+        }
+
+        await this.handleExecuteSeatLockAndUpiPush(this.context.passengerName, startTime, voiceTrigger);
+        this.isProcessing = false;
+        return;
+      } else if (lower.includes('no') || lower.includes('cancel') || lower.includes('wait') || lower.includes('nahi')) {
+        this.context.waitingForApproval = false;
+        const resp = "No problem! We haven't booked anything. Would you like to explore other timings, modes, or change the dates?";
         this.appendMessage({
           id: `agent-${Date.now()}`,
           role: 'agent',
           text: resp,
           timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'SOLICIT_PASSENGER_NAME',
+          intentDetected: 'BOOKING_DECLINED_BY_USER',
         });
         if (voiceTrigger) speechService.speak(resp);
         this.isProcessing = false;
         return;
       }
-
-      await this.handleSeatLockAndPaymentInitiation(startTime, voiceTrigger);
-      this.isProcessing = false;
-      return;
     }
 
-    // 8. Cancellation or Modification query
-    if (lower.includes('cancel my flight') || lower.includes('cancel booking') || lower.includes('modify')) {
-      await this.handleBookingCancellation(startTime, voiceTrigger);
-      this.isProcessing = false;
-      return;
-    }
-
-    // DEFAULT / NATURAL TRAVEL DISCOVERY
-    await this.handlePrimarySearchIntent(text, startTime, voiceTrigger);
+    // NATURAL STEP-BY-STEP CONVERSATIONAL ENGINE
+    await this.processStepwiseConversation(text, startTime, voiceTrigger);
     this.isProcessing = false;
   }
 
-  // Helper when user provides passenger name
-  private async handleNameProvidedAndConfirmHold(name: string, startTime: number, voiceTrigger: boolean) {
-    const opt = this.context.selectedOption || this.context.options[0];
-    const totalLatency = Math.round(performance.now() - startTime);
+  // Core Step-by-Step State Machine
+  private async processStepwiseConversation(text: string, startTime: number, voiceTrigger: boolean) {
+    const lower = text.toLowerCase();
 
-    const resp = `Berth locked for ${name}! Should I send the UPI payment request of ₹${opt?.price || 1280} to your Google Pay or PhonePe?`;
-    this.appendMessage({
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: resp,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'PASSENGER_NAME_CAPTURED_CONFIRM_PAYMENT',
-      latencyMs: totalLatency,
-    });
-    if (voiceTrigger) speechService.speak(resp);
-  }
+    // 1. EXTRACT SLOTS FROM USER UTTERANCE
+    const cityExtracted = extractCityFromText(text);
 
-  // --- HANDLER 1: PRIMARY DISCOVERY & MULTI-MODAL SEARCH ---
-  private async handlePrimarySearchIntent(rawText: string, startTime: number, voiceTrigger: boolean) {
-    const lower = rawText.toLowerCase();
-
-    // 1. Slot Extraction
-    if (lower.includes('goa')) {
-      this.context.destination = 'Goa';
-    } else if (lower.includes('kochi') || lower.includes('cochin')) {
-      this.context.destination = 'Kochi';
-    } else if (lower.includes('mumbai')) {
-      this.context.destination = 'Mumbai';
-    } else if (lower.includes('delhi')) {
-      this.context.destination = 'Delhi';
+    // Mid-conversation Destination Change
+    if (cityExtracted.destination && this.context.destination && cityExtracted.destination.toLowerCase() !== this.context.destination.toLowerCase()) {
+      this.context.destination = cityExtracted.destination;
+      this.context.options = [];
+      this.context.selectedOption = null;
+      this.context.waitingForApproval = false;
+      this.context.preferencesAsked = false;
+    } else if (cityExtracted.destination && !this.context.destination) {
+      this.context.destination = cityExtracted.destination;
     }
 
-    if (lower.includes('bangalore') || lower.includes('bengaluru') || lower.includes('blr')) {
-      this.context.origin = 'Bengaluru';
+    if (cityExtracted.origin) {
+      this.context.origin = cityExtracted.origin;
     }
 
-    // Extract Date
-    if (
-      lower.includes('friday') ||
-      lower.includes('tomorrow') ||
-      lower.includes('next week') ||
-      lower.includes('nov') ||
-      lower.includes('weekend')
-    ) {
-      this.context.date = 'Next Friday (Nov 6)';
-    }
-
-    // Extract Travel Mode
-    if (lower.includes('train') || lower.includes('railway') || lower.includes('irctc')) {
-      this.context.modePreference = 'train';
-    } else if (lower.includes('bus') || lower.includes('sleeper')) {
-      this.context.modePreference = 'bus';
-    } else if (lower.includes('flight') || lower.includes('plane') || lower.includes('fly')) {
-      this.context.modePreference = 'flight';
-    } else if (lower.includes('hotel') || lower.includes('resort')) {
-      this.context.modePreference = 'hotel';
-    }
-
-    // Extract Budget if explicitly stated by user
-    const budgetMatch = rawText.match(
-      /(?:budget|around|under|₹|rs\.?|inr)?\s*(\d{1,2}(?:,\d{3})+|\d+)\s*(?:k|thousand|rupees)?/i
-    );
-    if (lower.includes('8000') || lower.includes('8k') || lower.includes('₹8,000')) {
-      this.context.budget = 8000;
-    } else if (budgetMatch) {
-      const parsed = parseInt(budgetMatch[1].replace(/,/g, ''), 10);
-      if (parsed >= 500) {
-        this.context.budget = parsed;
+    // If destination was unknown and user just uttered a single word like "nagpur"
+    if (!this.context.destination) {
+      const trimmed = text.trim();
+      const singleWord = trimmed.split(/\s+/)[0];
+      if (singleWord.length >= 3 && !['yes', 'no', 'hello', 'hi', 'train', 'bus', 'flight'].includes(singleWord.toLowerCase())) {
+        this.context.destination = capitalize(singleWord);
       }
     }
 
-    // 2. User ONLY specified destination (e.g. "Goa") -> Natural, short human question!
+    // Extract Travel Date
     if (
-      this.context.destination &&
-      !this.context.date &&
-      !this.context.budget &&
-      !lower.includes('flight') &&
-      !lower.includes('bus') &&
-      !lower.includes('train') &&
-      !lower.includes('hotel')
+      lower.includes('tomorrow') ||
+      lower.includes('kal') ||
+      lower.includes('next friday') ||
+      lower.includes('friday') ||
+      lower.includes('saturday') ||
+      lower.includes('sunday') ||
+      lower.includes('monday') ||
+      lower.includes('tuesday') ||
+      lower.includes('wednesday') ||
+      lower.includes('thursday') ||
+      lower.includes('next week') ||
+      lower.includes('weekend') ||
+      lower.includes('nov') ||
+      lower.includes('dec')
     ) {
-      const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `Great, ${this.context.destination}! Are you looking for a Flight, Train, or Sleeper Bus?`;
+      if (lower.includes('tomorrow') || lower.includes('kal')) {
+        this.context.date = 'Tomorrow';
+      } else if (lower.includes('friday')) {
+        this.context.date = 'Next Friday';
+      } else if (lower.includes('monday')) {
+        this.context.date = 'Next Monday';
+      } else if (lower.includes('weekend')) {
+        this.context.date = 'This Weekend';
+      } else {
+        this.context.date = text.trim();
+      }
+    }
 
-      this.appendMessage({
-        id: `agent-${Date.now()}`,
-        role: 'agent',
-        text: agentResponse,
-        timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'SLOT_DISCOVERY_MODE_QUERY',
-        latencyMs: totalLatency,
-      });
+    // Extract Trip Type (One-way vs Return)
+    if (lower.includes('one way') || lower.includes('one-way') || lower.includes('single') || lower.includes('sirf jana') || lower.includes('oneway')) {
+      this.context.tripType = 'one-way';
+    } else if (lower.includes('return') || lower.includes('round trip') || lower.includes('both ways') || lower.includes('roundtrip') || lower.includes('wapas')) {
+      this.context.tripType = 'return';
+    }
 
-      if (voiceTrigger) speechService.speak(agentResponse);
+    // Extract Number of Travellers
+    const numMatch = text.match(/(\d+)\s*(?:people|persons|travellers|travelers|passengers|seats|tickets|log|adults)?/i);
+    if (lower.includes('just me') || lower.includes('solo') || lower.includes('alone') || lower.includes('single') || lower.includes('ek log') || lower.includes('1')) {
+      this.context.passengersCount = 1;
+    } else if (lower.includes('two') || lower.includes('do log') || lower.includes('couple') || lower.includes('2')) {
+      this.context.passengersCount = 2;
+    } else if (lower.includes('three') || lower.includes('teen log') || lower.includes('3')) {
+      this.context.passengersCount = 3;
+    } else if (lower.includes('four') || lower.includes('char log') || lower.includes('4')) {
+      this.context.passengersCount = 4;
+    } else if (numMatch) {
+      const parsed = parseInt(numMatch[1], 10);
+      if (parsed > 0) this.context.passengersCount = parsed;
+    }
+
+    // Extract Mode Preference
+    if (lower.includes('flight') || lower.includes('plane') || lower.includes('hawai') || lower.includes('fly')) {
+      this.context.modePreference = 'flight';
+    } else if (lower.includes('train') || lower.includes('railway') || lower.includes('irctc')) {
+      this.context.modePreference = 'train';
+    } else if (lower.includes('bus') || lower.includes('sleeper bus')) {
+      this.context.modePreference = 'bus';
+    } else if (lower.includes('hotel') || lower.includes('resort')) {
+      this.context.modePreference = 'hotel';
+    } else if (lower.includes('all') || lower.includes('everything') || lower.includes('sab') || lower.includes('any')) {
+      this.context.modePreference = 'all';
+    }
+
+    // Extract Class Preferences
+    if (lower.includes('3ac') || lower.includes('3 ac') || lower.includes('third ac')) {
+      this.context.selectedClass = '3AC';
+      this.context.modePreference = 'train';
+    } else if (lower.includes('2ac') || lower.includes('2 ac') || lower.includes('second ac')) {
+      this.context.selectedClass = '2AC';
+      this.context.modePreference = 'train';
+    } else if (lower.includes('sleeper') && !lower.includes('bus')) {
+      this.context.selectedClass = 'Sleeper';
+      this.context.modePreference = 'train';
+    }
+
+    // Check Interactive Questions if Options are already presented
+    if (this.context.options.length > 0) {
+      // 1. Cheaper query
+      if (lower.includes('cheaper') || lower.includes('sasta') || lower.includes('budget') || lower.includes('lowest price')) {
+        const cheapest = [...this.context.options].sort((a, b) => a.price - b.price)[0];
+        const resp = `The most affordable option is the ${cheapest.provider} ${cheapest.serviceNumber} at ₹${cheapest.price} (${cheapest.recommendationTag}). Would you like to proceed with this, or check flights?`;
+        this.context.selectedOption = cheapest;
+        this.speakAndRecord(resp, 'INTERACTIVE_CHEAPER_QUERY', startTime, voiceTrigger);
+        return;
+      }
+
+      // 2. Morning flight query
+      if (lower.includes('morning') || lower.includes('subah')) {
+        const morningFlight = this.context.options.find((o) => o.mode === 'flight' && o.departureTime.includes('AM')) || this.context.options[0];
+        this.context.selectedOption = morningFlight;
+        const resp = `The morning IndiGo flight departs at 06:20 AM and arrives at 08:05 AM for ₹${morningFlight.price}. Includes 15 kg check-in baggage. Should I select this option?`;
+        this.speakAndRecord(resp, 'INTERACTIVE_MORNING_QUERY', startTime, voiceTrigger);
+        return;
+      }
+
+      // 3. Fastest query
+      if (lower.includes('fastest') || lower.includes('quickest') || lower.includes('speed')) {
+        const fastest = this.context.options.find((o) => o.mode === 'flight') || this.context.options[0];
+        this.context.selectedOption = fastest;
+        const resp = `The fastest option is the direct flight with IndiGo at 1h 45m for ₹${fastest.price}. Would you like to select this flight?`;
+        this.speakAndRecord(resp, 'INTERACTIVE_FASTEST_QUERY', startTime, voiceTrigger);
+        return;
+      }
+
+      // 4. One day later query
+      if (lower.includes('one day later') || lower.includes('next day') || lower.includes('ek din baad')) {
+        this.context.date = 'Next Saturday';
+        const { options } = await travelEngine.searchTransportOptions(
+          this.context.origin || 'Mumbai',
+          this.context.destination,
+          'Next Saturday',
+          this.context.budget,
+          this.context.modePreference,
+          this.context.passengersCount || 1
+        );
+        this.context.options = options;
+        const resp = `Updated for Next Saturday! We have flights from ₹${options[0]?.price || 4800} and trains from ₹420. Which one works better for you?`;
+        this.speakAndRecord(resp, 'INTERACTIVE_DATE_SHIFT_QUERY', startTime, voiceTrigger);
+        return;
+      }
+
+      // 5. User selects an option (Flight, Train 3AC, Bus, etc.)
+      const isSelectingFlight = lower.includes('flight') || lower.includes('indigo') || lower.includes('akasa') || lower.includes('option 1');
+      const isSelecting3AC = lower.includes('3ac') || lower.includes('train') || lower.includes('third ac') || lower.includes('option 2');
+      const isSelectingBus = lower.includes('bus') || lower.includes('sleeper bus') || lower.includes('option 3');
+
+      if (isSelectingFlight || isSelecting3AC || isSelectingBus || lower.includes('select') || lower.includes('choose')) {
+        let chosen = this.context.options[0];
+        if (isSelecting3AC) {
+          chosen = this.context.options.find((o) => o.mode === 'train') || this.context.options[0];
+        } else if (isSelectingBus) {
+          chosen = this.context.options.find((o) => o.mode === 'bus') || this.context.options[0];
+        } else if (isSelectingFlight) {
+          chosen = this.context.options.find((o) => o.mode === 'flight') || this.context.options[0];
+        }
+
+        this.context.selectedOption = chosen;
+        this.context.step = 'option_selected';
+        this.context.waitingForApproval = true;
+        this.onStateChange({ ...this.context });
+
+        const pCount = this.context.passengersCount || 1;
+        const resp = `Selected ${chosen.provider} (${chosen.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Mumbai'} to ${this.context.destination} on ${this.context.date || 'Next Friday'}. Total fare is ₹${chosen.price}. Would you like me to proceed with this booking?`;
+        this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', startTime, voiceTrigger);
+        return;
+      }
+    }
+
+    // 2. ONE QUESTION AT A TIME: ASK THE NEXT MISSING PIECE OF INFORMATION
+    // Step 2: Destination & Origin
+    if (!this.context.destination) {
+      const resp = "Hello! Welcome. Where would you like to travel today?";
+      this.speakAndRecord(resp, 'STEP_1_ASK_DESTINATION', startTime, voiceTrigger);
       return;
     }
 
-    // 3. User specifically asked for Train -> Show train classes (Sleeper, 3AC, 2AC)!
-    if (this.context.modePreference === 'train' || (lower.includes('train') && !lower.includes('flight'))) {
-      this.context.step = 'discovering';
-      this.onStateChange({ ...this.context });
-      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
-        'BLR',
-        this.context.destination || 'GOA',
-        this.context.date || 'Next Friday',
-        null,
-        'train'
-      );
-      this.context.options = options;
-      this.context.selectedOption = options[0];
-      this.context.step = 'options_presented';
-
-      const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `For Bangalore to Goa, the Vasco Express has Sleeper (₹420), 3AC (₹1,280), and 2AC (₹1,850). Which class would you like?`;
-
-      this.appendMessage({
-        id: `agent-${Date.now()}`,
-        role: 'agent',
-        text: agentResponse,
-        timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'TRAIN_CLASSES_OFFERED',
-        toolCall: {
-          name: 'search_train_inventory',
-          params: { trainNo: '17309', classes: ['SL', '3A', '2A'] },
-          resultSummary: 'IRCTC 17309 Vasco Express Sleeper (₹420), 3AC (₹1,280), 2AC (₹1,850)',
-          durationMs: searchLatencyMs,
-        },
-        latencyMs: totalLatency,
-      });
-
-      if (voiceTrigger) speechService.speak(agentResponse);
+    if (!this.context.origin) {
+      const resp = `Where will you be travelling from to reach ${this.context.destination}?`;
+      this.speakAndRecord(resp, 'STEP_2_ASK_ORIGIN', startTime, voiceTrigger);
       return;
     }
 
-    // 4. User specifically asked for Bus -> Show bus classes (AC Sleeper vs Semi-Sleeper)!
-    if (this.context.modePreference === 'bus' || (lower.includes('bus') && !lower.includes('flight'))) {
-      this.context.step = 'discovering';
-      this.onStateChange({ ...this.context });
-      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
-        'BLR',
-        this.context.destination || 'GOA',
-        this.context.date || 'Next Friday',
-        null,
-        'bus'
-      );
-      this.context.options = options;
-      this.context.selectedOption = options[0];
-      this.context.step = 'options_presented';
-
-      const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `For buses, we have an AC Sleeper for ₹2,200 or a Volvo Semi-Sleeper for ₹1,450. Which one works better for you?`;
-
-      this.appendMessage({
-        id: `agent-${Date.now()}`,
-        role: 'agent',
-        text: agentResponse,
-        timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'BUS_CLASSES_OFFERED',
-        toolCall: {
-          name: 'search_bus_inventory',
-          params: { route: 'BLR-GOA', classes: ['AC_SLEEPER', 'SEMI_SLEEPER'] },
-          resultSummary: 'IntrCity Sleeper (₹2,200) & Zingbus Volvo (₹1,450)',
-          durationMs: searchLatencyMs,
-        },
-        latencyMs: totalLatency,
-      });
-
-      if (voiceTrigger) speechService.speak(agentResponse);
+    // Step 3: Travel Date
+    if (!this.context.date) {
+      const resp = `When would you like to travel to ${this.context.destination}?`;
+      this.speakAndRecord(resp, 'STEP_3_ASK_DATE', startTime, voiceTrigger);
       return;
     }
 
-    // 5. User specifically asked for Flight -> Short, punchy response!
-    if (this.context.modePreference === 'flight' || lower.includes('flight')) {
-      this.context.step = 'discovering';
-      this.onStateChange({ ...this.context });
-      const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
-        'BLR',
-        this.context.destination || 'GOA',
-        this.context.date || 'Next Friday',
-        null,
-        'flight'
-      );
-      this.context.options = options;
-      this.context.selectedOption = options[0];
-      this.context.step = 'options_presented';
-
-      const totalLatency = Math.round(performance.now() - startTime);
-      const agentResponse = `IndiGo non-stop at 11:15 AM is ₹5,400 with 15 kg check-in baggage. Shall I book this for you?`;
-
-      this.appendMessage({
-        id: `agent-${Date.now()}`,
-        role: 'agent',
-        text: agentResponse,
-        timestamp: new Date().toLocaleTimeString(),
-        intentDetected: 'FLIGHT_OFFERED',
-        toolCall: {
-          name: 'search_flight_inventory',
-          params: { route: 'BLR-GOA', flight: '6E-512', fare: 5400 },
-          resultSummary: 'IndiGo 6E-512 non-stop confirmed at ₹5,400',
-          durationMs: searchLatencyMs,
-        },
-        latencyMs: totalLatency,
-      });
-
-      if (voiceTrigger) speechService.speak(agentResponse);
+    // Step 4: Return Journey
+    if (!this.context.tripType) {
+      const resp = "Would you like a one-way trip or a return journey?";
+      this.speakAndRecord(resp, 'STEP_4_ASK_RETURN', startTime, voiceTrigger);
       return;
     }
 
-    // 6. Multi-modal Search across Flight, Train, and Bus
+    // Step 5: Number of Travellers
+    if (!this.context.passengersCount) {
+      const resp = "How many people will be travelling?";
+      this.speakAndRecord(resp, 'STEP_5_ASK_PASSENGER_COUNT', startTime, voiceTrigger);
+      return;
+    }
+
+    // Step 6: Mode of Transport
+    if (!this.context.modePreference) {
+      const resp = "How would you prefer to travel? By flight, train or bus?";
+      this.speakAndRecord(resp, 'STEP_6_ASK_MODE', startTime, voiceTrigger);
+      return;
+    }
+
+    // Step 7: Preferences (optional)
+    if (!this.context.preferencesAsked) {
+      this.context.preferencesAsked = true;
+      const resp = "Do you have any particular preferences, such as a morning journey, direct flight or a specific train/bus class?";
+      this.speakAndRecord(resp, 'STEP_7_ASK_PREFERENCES', startTime, voiceTrigger);
+      return;
+    }
+
+    // Step 8: FETCH & PRESENT GROUNDED OPTIONS FOR THIS EXACT ROUTE
     this.context.step = 'discovering';
     this.onStateChange({ ...this.context });
 
-    const searchToolStart = performance.now();
-    const targetDate = this.context.date || '2026-11-06 (Next Friday)';
-    const targetDest = this.context.destination || 'GOA';
-
+    const pCount = this.context.passengersCount || 1;
     const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
-      'BLR',
-      targetDest,
-      targetDate,
+      this.context.origin,
+      this.context.destination,
+      this.context.date,
       this.context.budget,
-      null
+      this.context.modePreference,
+      pCount
     );
 
     this.context.options = options;
     this.context.selectedOption = options[0];
     this.context.step = 'options_presented';
-
-    const toolDuration = Math.round(performance.now() - searchToolStart);
-    const totalLatency = Math.round(performance.now() - startTime);
-
-    let agentResponse = '';
-    if (this.context.budget) {
-      agentResponse = `Here are the best options for Goa next Friday under ₹${this.context.budget}: IndiGo flight at ₹5,400, or the Vasco Express train at ₹1,280. Which one do you prefer?`;
-    } else {
-      agentResponse = `For Goa next Friday, we have flights from ₹5,400, trains from ₹420, and sleeper buses from ₹1,450. Which mode do you prefer?`;
-    }
-
-    this.appendMessage({
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'MULTI_MODAL_SHORT_COMPARISON',
-      latencyMs: totalLatency,
-    });
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
-  }
-
-  // --- HANDLER 2: BAGGAGE & CANCELLATION QUERY ---
-  private async handleBaggageAndCancellationQuery(startTime: number, voiceTrigger: boolean) {
-    const option = this.context.selectedOption || this.context.options[0] || travelEngine.getHold('')?.selectedOption;
-    const rules = await travelEngine.checkFareRules(option?.id || 'opt-indigo-6e512');
-
-    const totalLatency = Math.round(performance.now() - startTime);
-
-    const agentResponse =
-      `Good question! Yes, this ₹${option?.price || 5400} fare is an economy regular ticket that includes **15 kg of check-in baggage** ` +
-      `plus **7 kg of cabin baggage**. Cancellation allows a partial refund up to 2 hours before departure (airline fee ₹2,500 applies). ` +
-      `Shall I reserve this seat for you?`;
-
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'ANCILLARY_BAGGAGE_RULES_CHECK',
-      toolCall: {
-        name: 'check_fare_rules',
-        params: { serviceNumber: option?.serviceNumber || '6E-512' },
-        resultSummary: '15kg check-in, 7kg cabin, partial refund <=2h',
-        durationMs: 140,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
-  }
-
-  // --- HANDLER 3: DESTINATION CHANGE ---
-  private async handleDestinationChange(startTime: number, voiceTrigger: boolean) {
-    this.context.destination = 'Kochi';
-    this.context.step = 'discovering';
     this.onStateChange({ ...this.context });
 
-    const { options, searchLatencyMs } = await travelEngine.searchTransportOptions('BLR', 'Kochi', '2026-11-06', 8000);
-    this.context.options = options;
-    this.context.selectedOption = options[0];
-    this.context.step = 'options_presented';
+    const resp = `Here are the available options for ${this.context.origin} to ${this.context.destination} on ${this.context.date} for ${pCount} traveller(s). Would you like to explore one of these, or should I look for alternatives?`;
 
-    const totalLatency = Math.round(performance.now() - startTime);
-
-    const agentResponse =
-      `No problem, switching to Kochi! I found a non-stop IndiGo flight (6E-421) departing Bangalore at 10:45 AM, arriving Cochin at 11:55 AM. ` +
-      `The fare is **₹4,890**, including 15 kg check-in baggage. Would you like me to book this for you instead?`;
-
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'MODIFICATION_DESTINATION_CHANGE',
-      toolCall: {
+    this.speakAndRecord(
+      resp,
+      'STEP_8_OPTIONS_PRESENTED',
+      startTime,
+      voiceTrigger,
+      {
         name: 'search_transport_options',
-        params: { origin: 'BLR', destination: 'COK', budget: 8000 },
-        resultSummary: 'Route switched to Bangalore -> Kochi',
+        params: {
+          origin: this.context.origin,
+          destination: this.context.destination,
+          date: this.context.date,
+          mode: this.context.modePreference,
+          passengers: pCount,
+        },
+        resultSummary: `Found ${options.length} verified live options across India`,
         durationMs: searchLatencyMs,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+      }
+    );
   }
 
-  // --- HANDLER 4: SEAT LOCK & SECURE PAYMENT PUSH ---
-  public async handleSeatLockAndPaymentInitiation(startTime: number = performance.now(), voiceTrigger: boolean = true) {
+  // --- STRICT CUSTOMER APPROVAL FIRST: LOCK SEAT & PUSH PAYMENT ---
+  private async handleExecuteSeatLockAndUpiPush(
+    passengerName: string,
+    startTime: number,
+    voiceTrigger: boolean
+  ) {
     const option = this.context.selectedOption || this.context.options[0];
     if (!option) return;
 
-    const passengerName = this.context.passengerName || 'Traveler';
     const upiHandle = `${passengerName.toLowerCase().replace(/\s+/g, '')}@okhdfcbank`;
     const passenger: PassengerDetails = {
       id: `usr-${Date.now()}`,
@@ -683,12 +604,10 @@ export class VoiceAgentOrchestrator {
       upiId: upiHandle,
       seatPreference:
         option.mode === 'train'
-          ? 'Berth 34 (Lower, 3AC)'
+          ? 'Berth 28 (Lower Berth, 3AC)'
           : option.mode === 'bus'
-          ? 'Upper Berth U4'
-          : option.mode === 'hotel'
-          ? 'Deluxe Balcony Room'
-          : '12F (Window)',
+          ? 'Single Sleeper Berth U4'
+          : '12F (Window Seat)',
     };
 
     this.context.step = 'seat_locked';
@@ -700,188 +619,129 @@ export class VoiceAgentOrchestrator {
     const txn = await paymentEngine.initiateUpiPush(hold.orderId, hold.amount, upiHandle);
     this.context.transaction = txn;
     this.context.step = 'payment_pushed';
+    this.context.waitingForApproval = false;
 
-    const totalLatency = Math.round(performance.now() - startTime);
+    const resp = `I've placed a 10-minute hold for ${passengerName} at ₹${hold.amount}. I sent an instant UPI payment request to your UPI ID (${upiHandle}). Please open Google Pay or PhonePe to approve the payment.`;
 
-    const agentResponse =
-      `I've placed a 10-minute hold for **${passengerName}** at **₹${hold.amount}**. ` +
-      `I have sent an instant UPI payment request of ₹${hold.amount} to your UPI ID (${upiHandle}). ` +
-      `Please open Google Pay or PhonePe to approve the payment.`;
-
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'SEAT_LOCK_AND_OUT_OF_BAND_PAYMENT',
-      toolCall: {
+    this.speakAndRecord(
+      resp,
+      'PAYMENT_PUSH_INITIATED',
+      startTime,
+      voiceTrigger,
+      {
         name: 'lock_fare_and_hold_pnr',
         params: { orderId: hold.orderId, amount: hold.amount, passenger: passengerName, upiVpa: upiHandle },
-        resultSummary: `10m hold active for ${passengerName}. UPI push sent to ${upiHandle}`,
-        durationMs: 320,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+        resultSummary: `10m hold active for ${passengerName}. Push sent to ${upiHandle}`,
+        durationMs: 310,
+      }
+    );
   }
 
-  // --- HANDLER 5: PAYMENT APPROVAL & CONFIRMATION ---
-  public async completePaymentSuccess(voiceTrigger: boolean = true) {
-    if (!this.context.transaction) return;
+  // --- SIMULATED USER UPI APPROVAL ---
+  public async handleSimulatedPaymentApproval() {
+    if (!this.context.transaction || !this.context.hold) return;
+
     this.context.step = 'payment_verifying';
     this.onStateChange({ ...this.context });
 
-    const { pnr } = await paymentEngine.simulateCustomerUpiApproval(this.context.transaction.transactionId);
-
-    this.context.step = 'confirmed';
-    if (this.context.hold) {
-      this.context.hold.pnr = pnr;
-      this.context.hold.status = 'paid';
-    }
-
+    const pnr = this.context.hold.pnr || `PNR-${Math.floor(1000 + Math.random() * 9000)}`;
     const passengerName = this.context.passengerName || 'Traveler';
-    const agentResponse =
-      `Payment received! Your ${this.context.selectedOption?.mode || 'ticket'} is confirmed for **${passengerName}**. ` +
-      `Your PNR is **${pnr}**. E-ticket sent to your WhatsApp. Have a wonderful journey!`;
 
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'PAYMENT_CAPTURED_AND_TICKET_ISSUED',
-      toolCall: {
-        name: 'issue_ticket_pnr',
-        params: { orderId: this.context.hold?.orderId, pnr, passenger: passengerName },
+    await new Promise((r) => setTimeout(r, 600));
+    this.context.transaction.status = 'CAPTURED';
+    this.context.step = 'confirmed';
+    this.context.hold.status = 'paid';
+
+    const resp = `Payment received! Your ${this.context.selectedOption?.mode || 'ticket'} is confirmed for ${passengerName}. Your PNR is ${pnr}. E-ticket has been sent to your WhatsApp. Have a wonderful journey!`;
+
+    this.speakAndRecord(
+      resp,
+      'PAYMENT_CAPTURED_AND_TICKET_CONFIRMED',
+      performance.now(),
+      true,
+      {
+        name: 'verify_and_issue_ticket',
+        params: { orderId: this.context.hold.orderId, pnr, passenger: passengerName },
         resultSummary: `Ticket confirmed: PNR ${pnr} issued for ${passengerName}`,
-        durationMs: 410,
-      },
-      latencyMs: 410,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+        durationMs: 380,
+      }
+    );
   }
 
-  // --- HANDLER 6: SCENARIO 5 - PAYMENT DEDUCTED BUT TICKET PENDING ---
+  // --- EXCEPTION: MONEY DEDUCTED / TICKET PENDING ---
   public async handlePaymentDeductedException(startTime: number = performance.now(), voiceTrigger: boolean = true) {
     this.context.step = 'payment_exception_recovery';
     this.onStateChange({ ...this.context });
 
-    const orderId = this.context.hold?.orderId || 'ORD-VOY-782194';
-    const audit = await paymentEngine.reconcileMoneyDeductedTicketPending(orderId);
+    const audit = await paymentEngine.reconcileMoneyDeductedTicketPending(
+      this.context.hold?.orderId || 'ORD-VOY-554109'
+    );
 
+    const passengerName = this.context.passengerName || 'Traveler';
     this.context.step = 'confirmed';
     if (this.context.hold) {
       this.context.hold.pnr = audit.pnr;
       this.context.hold.status = 'reconciled';
     }
 
-    const totalLatency = Math.round(performance.now() - startTime);
-    const passengerName = this.context.passengerName || 'Traveler';
+    const resp = `Don't worry, ${passengerName}! I ran an instant 3-way check across our payment gateway, bank ledger, and reservation system. Your payment was captured and your ticket is confirmed! Your PNR is ${audit.pnr}. Have a safe journey!`;
 
-    const agentResponse =
-      `Don't worry, ${passengerName}! I ran an instant 3-way check across our payment gateway, bank ledger, and reservation desk. ` +
-      `The payment was captured, and your ticket is confirmed! Your PNR is **${audit.pnr}**. Have a safe trip!`;
-
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'RECONCILIATION_MONEY_DEDUCTED_EXCEPTION',
-      toolCall: {
-        name: 'reconcile_money_deducted_ticket_pending',
-        params: { orderId },
-        resultSummary: `3-Way reconciliation completed: Bank=OK, GDS=CONFIRMED, PNR=${audit.pnr}`,
-        durationMs: 780,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+    this.speakAndRecord(
+      resp,
+      '3_WAY_RECONCILIATION_RESOLVED',
+      startTime,
+      voiceTrigger,
+      {
+        name: 'reconcile_and_issue_pnr',
+        params: { auditStatus: audit.resolvedStatus, pnr: audit.pnr },
+        resultSummary: `3-Way match verified. PNR ${audit.pnr} confirmed`,
+        durationMs: 440,
+      }
+    );
   }
 
-  // --- HANDLER 7: PRICE SPIKE REACTION ---
-  public async handlePriceSpikeReaction(startTime: number = performance.now(), voiceTrigger: boolean = true) {
-    travelEngine.triggerPriceSpike('opt-indigo-6e512', 8600);
-    const { options } = await travelEngine.searchTransportOptions('BLR', 'GOA', '2026-11-06', 9000);
-    this.context.options = options;
+  // --- PUBLIC OPTION SELECTION (From UI Click) ---
+  public handleSelectOptionExplicitly(opt: TravelOption) {
+    this.context.selectedOption = opt;
+    this.context.step = 'option_selected';
+    this.context.waitingForApproval = true;
     this.onStateChange({ ...this.context });
 
-    const totalLatency = Math.round(performance.now() - startTime);
-
-    const passengerName = this.context.passengerName || 'Traveler';
-    const agentResponse =
-      `Before I lock that seat: the airline just updated the fare from ₹5,400 to **₹8,600**, which exceeds your ₹8,000 budget. ` +
-      `However, there is another direct flight on **Akasa Air (QP-1344)** at 2:30 PM for **₹5,100**. ` +
-      `Would you prefer the 2:30 PM Akasa flight, or should we stick with IndiGo at ₹8,600?`;
-
-    const agentMsg: Message = {
-      id: `agent-${Date.now()}`,
-      role: 'agent',
-      text: agentResponse,
-      timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'DYNAMIC_FARE_SPIKE_DETECTION',
-      toolCall: {
-        name: 'check_fare_surge_and_alternatives',
-        params: { originalFlight: '6E-512', oldPrice: 5400, newPrice: 8600, alternative: 'QP-1344' },
-        resultSummary: 'Surge detected; offered Akasa Air QP-1344 at ₹5,100',
-        durationMs: 220,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+    const pCount = this.context.passengersCount || 1;
+    const resp = `Selected ${opt.provider} (${opt.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Mumbai'} to ${this.context.destination || 'Nagpur'} on ${this.context.date || 'Next Friday'}. Total fare is ₹${opt.price}. Would you like me to proceed with this booking?`;
+    this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', performance.now(), true);
   }
 
-  // --- HANDLER 8: BOOKING CANCELLATION & REFUND ---
-  public async handleBookingCancellation(startTime: number = performance.now(), voiceTrigger: boolean = true) {
-    this.context.step = 'cancelled';
-    this.onStateChange({ ...this.context });
+  // --- BAGGAGE AND CANCELLATION ---
+  private async handleBaggageAndCancellationQuery(startTime: number, voiceTrigger: boolean) {
+    const opt = this.context.selectedOption || this.context.options[0];
+    let resp = "For flights, 15 kg check-in baggage and 7 kg cabin baggage are included. Cancellations are refundable with standard airline fee.";
+    if (opt?.mode === 'train') {
+      resp = `For ${opt.serviceNumber}, IRCTC allows 40 kg free luggage. Cancellations are fully refundable minus standard IRCTC clerkage.`;
+    } else if (opt?.mode === 'bus') {
+      resp = `For ${opt.provider}, 20 kg luggage is stored in the compartment. Full refund is available up to 12 hours prior to departure.`;
+    }
 
-    const totalLatency = Math.round(performance.now() - startTime);
+    this.speakAndRecord(resp, 'BAGGAGE_AND_CANCELLATION_RESOLVED', startTime, voiceTrigger);
+  }
 
-    const agentResponse =
-      `I can process that for you. According to IndiGo's fare rules for PNR 6E-W8KZ7Q, cancelling today incurs a standard airline cancellation fee of ₹2,500. ` +
-      `You will receive a net refund of **₹2,900** credited back to your original payment method (HDFC UPI) within 48 hours. ` +
-      `Shall I execute this cancellation?`;
-
-    const agentMsg: Message = {
+  private speakAndRecord(
+    text: string,
+    intent: string,
+    startTime: number,
+    voiceTrigger: boolean,
+    toolCall?: Message['toolCall']
+  ) {
+    const latency = Math.round(performance.now() - startTime);
+    this.appendMessage({
       id: `agent-${Date.now()}`,
       role: 'agent',
-      text: agentResponse,
+      text,
       timestamp: new Date().toLocaleTimeString(),
-      intentDetected: 'POST_BOOKING_CANCELLATION_REFUND_INQUIRY',
-      toolCall: {
-        name: 'calculate_cancellation_refund',
-        params: { pnr: '6E-W8KZ7Q', totalFare: 5400, fee: 2500 },
-        resultSummary: 'Net refund ₹2,900 calculated deterministically',
-        durationMs: 160,
-      },
-      latencyMs: totalLatency,
-    };
-
-    this.appendMessage(agentMsg);
-
-    if (voiceTrigger) {
-      speechService.speak(agentResponse);
-    }
+      intentDetected: intent,
+      latencyMs: latency,
+      toolCall,
+    });
+    if (voiceTrigger) speechService.speak(text);
   }
 }

@@ -171,36 +171,36 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Suggested Quick Prompt Chips (inspired by Indian Superapp in Pic 4) */}
+      {/* Suggested Quick Prompt Chips (inspired by Indian Superapp) */}
       <div className="px-3 py-2 bg-slate-50 border-t border-slate-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] scrollbar-none">
         <span className="text-slate-400 font-bold shrink-0 text-[10px] uppercase">Suggestions:</span>
         <button
           type="button"
-          onClick={() => onSendMessage('Goa')}
+          onClick={() => onSendMessage('Nagpur')}
           className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
         >
-          🏖️ Goa jana hai
+          📍 Nagpur jana hai
         </button>
         <button
           type="button"
-          onClick={() => onSendMessage('Goa next Friday, budget around 8000')}
+          onClick={() => onSendMessage('Mumbai se Nagpur')}
           className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
         >
-          ✈️ Next Friday, budget ₹8k
+          🚆 Mumbai to Nagpur
         </button>
         <button
           type="button"
-          onClick={() => onSendMessage('Show me train options')}
+          onClick={() => onSendMessage('Next Friday, 2 travellers by train')}
           className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
         >
-          🚆 Train options
+          🗓️ Next Friday, 2 travellers
         </button>
         <button
           type="button"
-          onClick={() => onSendMessage('Does the flight include check-in baggage?')}
+          onClick={() => onSendMessage('What is the baggage and cancellation policy?')}
           className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
         >
-          🧳 Baggage allowance?
+          🧳 Baggage & Refund Policy
         </button>
         <button
           type="button"
@@ -220,7 +220,7 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Speak or type (e.g. 'Goa', 'Next Friday', 'Flights under ₹6,000')..."
+          placeholder="Speak or type (e.g. 'Nagpur', 'Mumbai to Delhi next Monday', '3AC train')..."
           className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
         />
         <button

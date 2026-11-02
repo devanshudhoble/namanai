@@ -142,7 +142,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
             <p className="text-[12px] text-slate-500 font-medium">
               {isListening
                 ? 'Listening... Tell me where you want to travel.'
-                : '💡 Try saying: "Goa", "Next Friday", or "Show me train options"'}
+                : '💡 Speak naturally: mention any city (e.g. Nagpur, Delhi, Manali), date, or ask a question'}
             </p>
           )}
         </div>

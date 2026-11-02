@@ -22,6 +22,7 @@ import {
   Calendar,
   Share2,
   ExternalLink,
+  Compass,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -31,6 +32,10 @@ interface TravelCanvasProps {
   hold: BookingHold | null;
   transaction: PaymentTransaction | null;
   step: AgentStateStep;
+  origin?: string;
+  destination?: string;
+  date?: string;
+  passengersCount?: number;
   onSelectOption: (opt: TravelOption) => void;
   onApprovePayment: () => void;
   onSimulateDeductionPending: () => void;
@@ -44,6 +49,10 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
   hold,
   transaction,
   step,
+  origin,
+  destination,
+  date,
+  passengersCount,
   onSelectOption,
   onApprovePayment,
   onSimulateDeductionPending,
@@ -485,6 +494,57 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* 6. REAL-TIME TRIP PLANNING STEP PROGRESS (When options are not yet generated) */}
+      {options.length === 0 && !isConfirmed && !hold && (
+        <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-6">
+          <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-200">
+                Live Journey Planning
+              </span>
+              <h3 className="text-base font-extrabold text-slate-900 mt-2">
+                {destination ? `Planning Trip to ${destination}` : 'Where would you like to travel?'}
+              </h3>
+            </div>
+            <span className="text-xs text-slate-500 font-medium">Step-by-Step Voice Assistant</span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className={`p-3.5 rounded-2xl border transition ${origin ? 'bg-blue-50/70 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">From (Origin)</span>
+              <span className="font-extrabold text-slate-900 text-sm">{origin || 'Speaking...'}</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border transition ${destination ? 'bg-blue-50/70 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">To (Destination)</span>
+              <span className="font-extrabold text-slate-900 text-sm">{destination || 'Speak any city'}</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border transition ${date ? 'bg-blue-50/70 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Travel Date</span>
+              <span className="font-extrabold text-slate-900 text-sm">{date || 'Pending'}</span>
+            </div>
+
+            <div className={`p-3.5 rounded-2xl border transition ${passengersCount ? 'bg-blue-50/70 border-blue-200' : 'bg-slate-50 border-slate-200'}`}>
+              <span className="text-[10px] text-slate-500 uppercase font-bold block mb-1">Travellers</span>
+              <span className="font-extrabold text-slate-900 text-sm">{passengersCount ? `${passengersCount} Passenger(s)` : 'Pending'}</span>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 text-xs text-slate-700 flex items-start space-x-3">
+            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 mt-0.5">
+              <Compass className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="font-bold text-blue-950 mb-0.5">Natural Voice Travel Planner</p>
+              <p className="text-slate-600 leading-relaxed text-[11px]">
+                Speak naturally in English, Hindi, or Hinglish. Mention any state, city, or village across India. The assistant will guide you step-by-step and show verified real-time flight, IRCTC train, and intercity bus availability.
+              </p>
+            </div>
           </div>
         </div>
       )}
