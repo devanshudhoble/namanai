@@ -23,9 +23,16 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment Variables & Secrets - STRICTLY IGNORED
+.env
+.env.*
+*.env
+backend/.env
+backend/.env.*
+
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
 venv/
-.env
+.venv/
