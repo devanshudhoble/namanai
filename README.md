@@ -10,13 +10,23 @@
 
 ---
 
-## 📱 Product Experience & Design
+## 📱 Product Experience & Live UI Screenshots
 
-![VoyAI Flagship Product Experience](public/docs/flagship_mobile_app.png)
-*Flagship Indian Travel AI Experience: Step-by-Step Voice Dialogue, Multi-Modal Options & Out-of-Band UPI*
+### 1. Clean White & Royal Blue Consumer Interface
+![VoyAI Clean Superapp Interface](public/docs/app_live_screen.png)
+*Clean Consumer Interface: Universal Voice Assistant, Real-Time Journey Tracking & Zero Developer Clutter*
 
-![Product Dashboard](public/docs/product_ui_dashboard.png)
-*Multi-Modal Travel Canvas: Flights, IRCTC Trains (3AC, 2AC, Sleeper), Intercity Buses & Hotels with Live 10-Min Seat Hold*
+### 2. Step-by-Step Dialogue with Dynamic Date Parsing (Jodhpur on 4th Nov)
+![Live Conversation to Jodhpur](public/docs/live_journey_jodhpur.png)
+*Natural Stepwise Dialogue: City recognition, calendar-aware date parsing ('4' ➔ 4th Nov), and live multi-modal results with Mandore SF Express*
+
+### 3. Explicit Customer Approval Review (Customer Approval First)
+![Customer Booking Approval Review](public/docs/live_approval_review.png)
+*Customer Approval Review: Complete fare breakdown & mandatory verbal confirmation before locking or initiating payment*
+
+### 4. 10-Minute Seat Lock & Out-of-Band UPI Push
+![10-Minute Seat Hold & UPI Collect](public/docs/live_upi_hold_screen.png)
+*Zero-Voice-Credentials: Idempotent 10-minute price hold with out-of-band UPI push sent to Google Pay / PhonePe*
 
 ---
 
