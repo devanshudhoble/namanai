@@ -1,4 +1,4 @@
-export type TravelMode = 'flight' | 'bus' | 'train';
+export type TravelMode = 'flight' | 'bus' | 'train' | 'hotel';
 
 export interface BaggagePolicy {
   cabin: string;

@@ -171,6 +171,46 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Suggested Quick Prompt Chips (inspired by Indian Superapp in Pic 4) */}
+      <div className="px-3 py-2 bg-slate-50 border-t border-slate-200/80 flex items-center space-x-1.5 overflow-x-auto text-[11px] scrollbar-none">
+        <span className="text-slate-400 font-bold shrink-0 text-[10px] uppercase">Suggestions:</span>
+        <button
+          type="button"
+          onClick={() => onSendMessage('Goa')}
+          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
+        >
+          🏖️ Goa jana hai
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendMessage('Goa next Friday, budget around 8000')}
+          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
+        >
+          ✈️ Next Friday, budget ₹8k
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendMessage('Show me train options')}
+          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
+        >
+          🚆 Train options
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendMessage('Does the flight include check-in baggage?')}
+          className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
+        >
+          🧳 Baggage allowance?
+        </button>
+        <button
+          type="button"
+          onClick={() => onSendMessage('My money has been deducted from Google Pay but ticket pending')}
+          className="px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer shrink-0 font-bold shadow-2xs"
+        >
+          💳 Money deducted, ticket pending
+        </button>
+      </div>
+
       {/* Manual Input Fallback */}
       <form
         onSubmit={handleSubmit}

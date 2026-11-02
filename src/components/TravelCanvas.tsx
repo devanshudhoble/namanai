@@ -9,6 +9,7 @@ import {
   Plane,
   Bus,
   Train,
+  Hotel,
   Clock,
   Luggage,
   ShieldAlert,
@@ -50,6 +51,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
   onVoiceSupportQuery,
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(600);
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flight' | 'train' | 'bus' | 'hotel'>('all');
 
   useEffect(() => {
     if (!hold || hold.status !== 'held') return;
@@ -287,80 +289,140 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
         </div>
       )}
 
-      {/* 5. MULTI-MODAL TRAVEL OPTIONS: FLIGHT, TRAIN, BUS */}
+      {/* 5. MULTI-MODAL TRAVEL OPTIONS: FLIGHT, TRAIN, BUS, HOTEL */}
       {options.length > 0 && !isConfirmed && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
-              <span>Available Travel Options</span>
-              <span className="text-[11px] font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                Flights • Trains • Buses
+              <span>Verified Travel Options</span>
+              <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                Live Pricing & Seats
               </span>
             </h3>
-            <span className="text-xs text-slate-500 font-bold">
-              {options.length} verified options
-            </span>
+
+            {/* Travel Mode Filter Tabs */}
+            <div className="flex items-center space-x-1 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={`px-2.5 py-1 rounded-lg transition cursor-pointer ${
+                  selectedCategory === 'all'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                All ({options.length})
+              </button>
+              <button
+                onClick={() => setSelectedCategory('flight')}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                  selectedCategory === 'flight'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                ✈️ Flights
+              </button>
+              <button
+                onClick={() => setSelectedCategory('train')}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                  selectedCategory === 'train'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🚆 Trains
+              </button>
+              <button
+                onClick={() => setSelectedCategory('bus')}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                  selectedCategory === 'bus'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🚌 Buses
+              </button>
+              <button
+                onClick={() => setSelectedCategory('hotel')}
+                className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                  selectedCategory === 'hotel'
+                    ? 'bg-white text-blue-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                🏨 Hotels
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 gap-3">
-            {options.map((opt) => {
-              const isSelected = selectedOption?.id === opt.id;
-              const isFlight = opt.mode === 'flight';
-              const isTrain = opt.mode === 'train';
+            {options
+              .filter((opt) => (selectedCategory === 'all' ? true : opt.mode === selectedCategory))
+              .map((opt) => {
+                const isSelected = selectedOption?.id === opt.id;
+                const isFlight = opt.mode === 'flight';
+                const isTrain = opt.mode === 'train';
+                const isHotel = opt.mode === 'hotel';
 
-              return (
-                <div
-                  key={opt.id}
-                  onClick={() => onSelectOption(opt)}
-                  className={`p-4 rounded-2xl transition cursor-pointer border ${
-                    isSelected
-                      ? 'glass-card-active'
-                      : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-xs'
-                  }`}
-                >
-                  {/* Top tags */}
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center space-x-2.5">
-                      <div
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                          isFlight
-                            ? 'bg-blue-100 text-blue-700'
-                            : isTrain
-                            ? 'bg-amber-100 text-amber-800'
-                            : 'bg-emerald-100 text-emerald-800'
-                        }`}
-                      >
-                        {isFlight ? (
-                          <Plane className="w-4 h-4" />
-                        ) : isTrain ? (
-                          <Train className="w-4 h-4" />
-                        ) : (
-                          <Bus className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div>
-                        <div className="flex items-center space-x-1.5">
-                          <h4 className="text-sm font-extrabold text-slate-900">{opt.provider}</h4>
-                          <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                            {opt.mode}
+                return (
+                  <div
+                    key={opt.id}
+                    onClick={() => onSelectOption(opt)}
+                    className={`p-4 rounded-2xl transition cursor-pointer border ${
+                      isSelected
+                        ? 'glass-card-active'
+                        : 'bg-white border-slate-200 hover:border-blue-400 hover:shadow-xs'
+                    }`}
+                  >
+                    {/* Top tags */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center space-x-2.5">
+                        <div
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                            isFlight
+                              ? 'bg-blue-100 text-blue-700'
+                              : isTrain
+                              ? 'bg-amber-100 text-amber-800'
+                              : isHotel
+                              ? 'bg-purple-100 text-purple-700'
+                              : 'bg-emerald-100 text-emerald-800'
+                          }`}
+                        >
+                          {isFlight ? (
+                            <Plane className="w-4 h-4" />
+                          ) : isTrain ? (
+                            <Train className="w-4 h-4" />
+                          ) : isHotel ? (
+                            <Hotel className="w-4 h-4" />
+                          ) : (
+                            <Bus className="w-4 h-4" />
+                          )}
+                        </div>
+                        <div>
+                          <div className="flex items-center space-x-1.5">
+                            <h4 className="text-sm font-extrabold text-slate-900">{opt.provider}</h4>
+                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                              {opt.mode}
+                            </span>
+                          </div>
+                          <span className="text-[11px] font-mono text-slate-500 font-medium">
+                            {opt.serviceNumber}
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono text-slate-500 font-medium">{opt.serviceNumber}</span>
                       </div>
+
+                      {opt.recommendationTag && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
+                          {opt.recommendationTag}
+                        </span>
+                      )}
+
+                      {opt.isSpiked && (
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
+                          ⚠️ Airline Fare Surged
+                        </span>
+                      )}
                     </div>
-
-                    {opt.recommendationTag && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-blue-50 text-blue-700 border border-blue-200">
-                        {opt.recommendationTag}
-                      </span>
-                    )}
-
-                    {opt.isSpiked && (
-                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 animate-pulse">
-                        ⚠️ Airline Fare Surged
-                      </span>
-                    )}
-                  </div>
 
                   {/* Schedule & Duration */}
                   <div className="flex items-center justify-between py-2.5 border-y border-slate-100 text-xs">

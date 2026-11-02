@@ -60,6 +60,60 @@ MOCK_INVENTORY = [
         },
         "trade_off_description": "Budget alternative. Leaves ₹5,800 savings in budget.",
         "is_recommended": False
+    },
+    {
+        "id": "opt-irctc-train-17309",
+        "mode": "train",
+        "provider": "Indian Railways (IRCTC)",
+        "operator": "Vasco Da Gama Express",
+        "service_number": "17309-EXP",
+        "origin": "Bengaluru (KSR City Station)",
+        "origin_code": "SBC",
+        "destination": "Goa (Madgaon Junction)",
+        "dest_code": "MAO",
+        "departure_time": "02:30 PM",
+        "arrival_time": "11:10 PM",
+        "duration": "8h 40m (Direct Express)",
+        "price": 1280.0,
+        "baggage": {
+            "cabin": "10 kg Personal Luggage",
+            "check_in": "40 kg Free Allowance"
+        },
+        "cancellation": {
+            "refundable": True,
+            "refund_summary": "Full refund minus ₹120 clerkage up to 4h prior",
+            "fee_before_24h": 120.0,
+            "fee_within_24h": 350.0
+        },
+        "trade_off_description": "Scenic 3AC sleeper train to Madgaon Goa. Only ₹1,280 with 40 kg baggage.",
+        "is_recommended": False
+    },
+    {
+        "id": "opt-hotel-seabreeze",
+        "mode": "hotel",
+        "provider": "Sea Breeze Beach Resort",
+        "operator": "Sea Breeze Goa",
+        "service_number": "HTL-GOA-SB",
+        "origin": "Calangute Beach",
+        "origin_code": "CAL-BEACH",
+        "destination": "Goa (North Goa)",
+        "dest_code": "GOA",
+        "departure_time": "Fri, Nov 6",
+        "arrival_time": "Sun, Nov 8 (2 Nights)",
+        "duration": "2 Nights / 3 Days",
+        "price": 3450.0,
+        "baggage": {
+            "cabin": "Deluxe AC Room with Balcony",
+            "check_in": "Complimentary Buffet Breakfast & Pool Access"
+        },
+        "cancellation": {
+            "refundable": True,
+            "refund_summary": "100% Free Cancellation till 24 hours prior",
+            "fee_before_24h": 0.0,
+            "fee_within_24h": 1200.0
+        },
+        "trade_off_description": "Beachfront resort 200m from Calangute. Includes breakfast and free cancellation.",
+        "is_recommended": True
     }
 ]
 
