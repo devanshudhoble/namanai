@@ -37,12 +37,22 @@ export interface AgentContext {
 }
 
 const KNOWN_INDIAN_CITIES = [
+  // Metros & Tier-2/3 Hubs
   'nagpur', 'mumbai', 'delhi', 'bengaluru', 'bangalore', 'pune', 'hyderabad', 'chennai',
   'kolkata', 'ahmedabad', 'jaipur', 'lucknow', 'chandigarh', 'varanasi', 'bhopal',
   'indore', 'patna', 'surat', 'kochi', 'cochin', 'goa', 'amritsar', 'manali', 'shimla',
   'dehradun', 'ayodhya', 'shirdi', 'haridwar', 'rishikesh', 'udaipur', 'jodhpur', 'agra',
   'vadodara', 'coimbatore', 'visakhapatnam', 'vizag', 'ranchi', 'raipur', 'guwahati',
-  'bhubaneswar', 'wardha', 'amravati', 'solapur', 'nashik', 'latur', 'nanded', 'kolhapur'
+  'bhubaneswar', 'wardha', 'amravati', 'solapur', 'nashik', 'latur', 'nanded', 'kolhapur',
+  'mysore', 'mysuru', 'mangalore', 'kannur', 'kozhikode', 'thiruvananthapuram', 'trivandrum',
+  'madurai', 'tirupati', 'vijayawada', 'guntur', 'salem', 'trichy', 'pondicherry', 'puducherry',
+  'darjeeling', 'gangtok', 'shillong', 'siliguri', 'dhanbad', 'jamshedpur', 'gwalior', 'jabalpur',
+  'ujjain', 'kanpur', 'allahabad', 'prayagraj', 'meerut', 'bareilly', 'aligarh', 'moradabad',
+  // All Indian States & UTs
+  'kerala', 'kashmir', 'rajasthan', 'himachal', 'uttarakhand', 'punjab', 'haryana', 'gujarat',
+  'maharashtra', 'karnataka', 'tamil nadu', 'andhra pradesh', 'telangana', 'odisha', 'bihar',
+  'jharkhand', 'west bengal', 'assam', 'sikkim', 'meghalaya', 'tripura', 'manipur', 'mizoram',
+  'nagaland', 'arunachal pradesh', 'ladakh', 'jammu', 'chhattisgarh', 'madhya pradesh', 'uttar pradesh'
 ];
 
 function extractCityFromText(text: string): { destination?: string; origin?: string } {
