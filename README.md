@@ -150,7 +150,111 @@ Agent:    "Don't worry, Devanshu! I ran an instant 3-way check across our paymen
 
 ---
 
-## 🛠️ Quick Start & Setup
+## 🏗️ Agent Architecture & System Design
+
+```
+                          VOYAI AGENTIC SYSTEM ARCHITECTURE
+  
+  [ Traveler Voice Input (Hindi / Hinglish / Indian English) ]
+                             │
+                             ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ 1. Voice Streaming & Audio Ingestion Layer                             │
+  │    • Web Speech Streaming API / Silero VAD Voice Activity Detection    │
+  │    • Client-side Audio Equalizer (24-Band FFT Waveform)                │
+  │    • Barge-In Interruption Handler (cancels playback mid-sentence)    │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                      │ Streaming Text (<250ms)
+                                      ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ 2. Context Engineering Harness & Security Guardrails                   │
+  │    • Zero-Voice-Credentials: Regex/NLP filter intercepts PIN/OTP leaks│
+  │    • Deterministic Slot State Matrix (Origin, Dest, Date, Mode, PCount)│
+  │    • Dynamic Indian Calendar Date Parser (Resolves "4" -> 4th Nov)    │
+  │    • Sliding Dialogue Window (Preserves state across turns)           │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                      │ Grounded Context
+                                      ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ 3. Agentic Orchestrator & LLM Reasoning Core                           │
+  │    • Google Gemini 2.5 Flash / Fast Reasoning Engine                   │
+  │    • Stepwise Dialogue State Machine (One polite question at a time)   │
+  │    • Constrained Function Calling Tool Dispatcher                      │
+  │    • Strict Customer Approval Gate (Never books without consent)       │
+  └───────────────────┬───────────────────────────────▲────────────────────┘
+                      │ Tool Call Payload (JSON)      │ Verified Results
+                      ▼                               │
+  ┌───────────────────────────────────────────────────┴────────────────────┐
+  │ 4. Deterministic Travel Hub & Grounding Layer                          │
+  │    • Universal India Geo Engine (28 States, UTs, Metros, Villages)     │
+  │    • Flight Grounder (IndiGo 6E, Akasa Air, Air India)                 │
+  │    • IRCTC Railway Grounder: Sleeper (₹420), 3AC (₹1,280), 2AC (₹1,850)│
+  │    • Intercity Bus Grounder: BharatBenz AC Sleeper, Volvo Semi-Sleeper │
+  │    • Destination Hotel Grounder with live ratings and cancellation     │
+  └───────────────────┬────────────────────────────────────────────────────┘
+                      │ Selected Booking Details
+                      ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ 5. Out-of-Band Payment & Reconciliation Engine                         │
+  │    • 10-Minute PNR Inventory Price Lock (Hold Order ID)                │
+  │    • Out-of-Band UPI Push Dispatch (Google Pay, PhonePe, Paytm)        │
+  │    • Automated 3-Way Bank Reconciliation: Bank ↔ Ledger ↔ GDS          │
+  └───────────────────┬────────────────────────────────────────────────────┘
+                      │ Verified Spoken Summary
+                      ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ 6. Neural Voice Synthesis Layer                                        │
+  │    • Sarvam AI Bulbul Neural TTS (Model: bulbul:v3, Speaker: kavya)    │
+  │    • Natural Indian Phonetics with Low-Latency Streaming Audio Playback│
+  └───────────────────┬────────────────────────────────────────────────────┘
+                      │ Base64 Audio Playback + Synchronized UI Cards
+                      ▼
+  [ Interactive Boarding Pass + Confirmed PNR on WhatsApp (+91 98450 12345) ]
+```
+
+---
+
+## 💻 Complete Technology Stack
+
+| Domain | Technology / Framework | Purpose |
+| :--- | :--- | :--- |
+| **Frontend Framework** | **React 18 + TypeScript** | Strongly-typed component architecture with sub-millisecond state updates |
+| **Bundler & Build Tool** | **Vite 8 + ESBuild** | Lightning-fast HMR and optimized production client assets |
+| **Styling & Design System** | **Tailwind CSS v4** | Clean white & royal blue superapp aesthetics tailored for Indian users |
+| **Voice Synthesis (TTS)** | **Sarvam AI Bulbul:v3** | High-fidelity Indian English and Hindi neural voice (`kavya`) |
+| **Agent Reasoning & LLM** | **Google Gemini 2.5 Flash** | Ultra-low latency intent classification, slot resolution & dialogue |
+| **Backend API Engine** | **Python 3.11 + FastAPI** | High-throughput asynchronous REST API for grounding and payment flows |
+| **ASGI Server** | **Uvicorn** | Production-ready ASGI server supporting async event loops |
+| **HTTP Client** | **HTTPX (Async)** | Non-blocking external API requests to travel and payment gateways |
+| **Data Validation** | **Pydantic v2** | Strict schema validation for GDS inventory and UPI transactions |
+| **Icons & Animation** | **Lucide React + Canvas Confetti** | Crisp UI iconography and booking confirmation celebrations |
+| **Cloud Deployment** | **Render.com / Docker / Vercel** | Containerized web service deployment with zero downtime |
+
+---
+
+## ⚙️ Environment Variables (.env) Configuration
+
+To run locally or deploy to cloud platforms like **Render.com**, configure the following environment variables:
+
+### 1. Frontend (`.env` in root)
+```env
+# Frontend Client Configuration
+VITE_SARVAM_API_KEY=your_sarvam_api_key_here
+VITE_GEMINI_API_KEY=your_gemini_api_key_here
+VITE_API_URL=http://localhost:8000
+```
+> *For Render deployment: Set `VITE_API_URL` to your live backend Render URL (e.g. `https://namanai-backend.onrender.com`).*
+
+### 2. Backend (`backend/.env` or Render Web Service Settings)
+```env
+# Backend Service Configuration
+SARVAM_API_KEY=your_sarvam_api_key_here
+GEMINI_API_KEY=your_gemini_api_key_here
+PORT=8000
+PYTHON_VERSION=3.11.0
+```
+
+---
 
 ### 1. Frontend Setup (React + Vite + Tailwind CSS)
 
