@@ -10,6 +10,12 @@ A working prototype plus a product case study, built around one idea: **with mon
 
 > Independent concept, not affiliated with Paytm. Travel inventory and payments are **sandbox**; see [what's real vs simulated](#whats-real-vs-simulated).
 
+## ▶ 2-minute walkthrough
+
+[![Walkthrough: one Hinglish sentence to bookable options](docs/demo/highlight.gif)](docs/demo/voyai_walkthrough.mp4)
+
+**[Watch the full 2-minute walkthrough (MP4)](docs/demo/voyai_walkthrough.mp4)**: one-sentence Hinglish booking (understood by Gemini) → read-back and explicit approval → fare hold and in-app UPI → bank timeout and idempotent retry → "money debited, seat sold out" reconciled to a full auto-refund → UPI PIN blocked by the credential guard → live journey insights.
+
 ---
 
 ## Product focus areas

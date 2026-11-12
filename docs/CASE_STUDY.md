@@ -160,7 +160,7 @@ This is what lets a PM promise legal and compliance that the agent cannot invent
 | Wrong booking (misheard date/city) | Read-back + explicit approval. Slot ledger shows what was understood | Measure ASR WER on accents and noisy stations |
 | LLM invents a fare or PNR | Tools decide, templates speak, grounding validator | Extend to LLM small-talk in more languages |
 | Social engineering / PIN sharing | Credential guard before LLM and logs. PIN only on UPI screen | Detect "agent impersonation" scams in support flows |
-| Latency kills voice UX | NLU without "thinking", 4.5 s timeout → rules fallback, p50/p90 measured | Streaming STT + TTS |
+| Latency kills voice UX | NLU without "thinking", 7 s timeout → rules fallback, p50/p90 measured | Streaming STT + TTS |
 | LLM outage | Offline rules engine with the same output shape (100% on current golden set) | Golden set must come from real traffic |
 | Privacy (DPDP Act 2023) | Number redaction before the LLM, no audio stored, keys server-side | Consent copy, retention policy, data residency of providers |
 | Cost per session | 1,200-token context budget per turn, small JSON output | Measure real tokens per booking. Cache stable prompt prefix |

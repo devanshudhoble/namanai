@@ -45,7 +45,7 @@ export function llmUnderstand(utterance: string, contextPrompt: string, todayISO
   return postJson<LlmUnderstandResponse>(
     '/api/agent/understand',
     { utterance, context: contextPrompt, today: todayISO },
-    4500
+    7000
   );
 }
 

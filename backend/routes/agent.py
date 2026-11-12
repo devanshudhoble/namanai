@@ -29,7 +29,7 @@ router = APIRouter(prefix="/api/agent", tags=["Agent understanding"])
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-GEMINI_TIMEOUT_S = float(os.getenv("GEMINI_TIMEOUT_S", "4"))
+GEMINI_TIMEOUT_S = float(os.getenv("GEMINI_TIMEOUT_S", "6"))
 
 INTENTS = [
     "trip_details", "ask_cheaper", "ask_fastest", "ask_morning", "select_option", "approve", "decline",
