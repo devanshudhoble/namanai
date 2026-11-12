@@ -119,15 +119,17 @@
   <div class="map">
     <div><span>01</span>Executive summary</div>
     <div><span>07</span>Context engineering &amp; the harness</div>
-    <div><span>02</span>Working backwards: press release &amp; FAQ</div>
+    <div><span>·</span>Case study at a glance</div>
     <div><span>08</span>Payments, failures and refunds</div>
-    <div><span>03</span>Problem diagnosis</div>
+    <div><span>02</span>Working backwards: press release &amp; FAQ</div>
     <div><span>09</span>Measurement and experiment</div>
-    <div><span>04</span>Customer insights</div>
+    <div><span>03</span>Problem diagnosis</div>
     <div><span>10</span>Pre-mortem and risks</div>
+    <div><span>04</span>User personas and insights</div>
+    <div><span>11</span>Go-to-market</div>
     <div><span>05</span>Strategy and prioritisation</div>
-    <div><span>11</span>Roadmap</div>
-    <div><span>06</span>The product</div>
+    <div><span>12</span>Execution plan</div>
+    <div><span>06</span>Product design</div>
     <div><span>A</span>Appendix: prototype and assumptions</div>
   </div>
   <div class="bottom"><span>Devanshu Dhoble</span><span>November 2026</span></div>
@@ -166,6 +168,66 @@
   <div class="foot"><span>Say it once. Book it safely.</span><span>2</span></div>
 </div>
 
+
+<!-- ================================ AT A GLANCE ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">·</span><h2>The case study at a glance</h2><span class="kick">Four lenses</span></div>
+  <p class="thesis">Every product decision in this memo answers one of four questions: who it is for, how it reaches them, what they experience, and how it gets built and proven.</p>
+
+  <div class="g2">
+    <div class="box">
+      <div class="eyebrow">1 · User personas</div>
+      <h4 style="margin-top:4pt">Who is this for, and what job are they hiring it to do?</h4>
+      <ul style="font-size:8.5pt;margin-top:4pt">
+        <li>Three personas: <b>family booker</b> (Hindi-first, Tier-2/3), <b>busy regular</b> (metro, price-sensitive), <b>anxious payer</b> (post-payment, any segment)</li>
+        <li>Jobs-to-be-done, behaviours, frustrations and five insights, each with a "so what"</li>
+        <li><b>Built:</b> Hinglish one-sentence booking, read-back before booking, cross-mode cheapest/fastest, in-chat payment recovery</li>
+      </ul>
+      <p class="small">Sections 03, 04</p>
+    </div>
+    <div class="box">
+      <div class="eyebrow">2 · Go-to-market</div>
+      <h4 style="margin-top:4pt">How does it reach the first 1% of users, and win them?</h4>
+      <ul style="font-size:8.5pt;margin-top:4pt">
+        <li><b>Beachhead:</b> Hindi-first Android UPI users in Hindi-belt states, plus existing train bookers who need post-booking help</li>
+        <li>Positioning, three message pillars, in-app entry points, launch sequence, adoption funnel, unit economics</li>
+        <li><b>Built:</b> Hindi/Hinglish entry copy, demo scenarios, walkthrough video, adoption instrumentation</li>
+      </ul>
+      <p class="small">Sections 05, 11</p>
+    </div>
+    <div class="box">
+      <div class="eyebrow">3 · Product design</div>
+      <h4 style="margin-top:4pt">What does the customer experience, and what keeps it safe?</h4>
+      <ul style="font-size:8.5pt;margin-top:4pt">
+        <li>Six principles, a turn-by-turn conversation design, Now/Next/Later scope</li>
+        <li>Context engineering harness: the LLM understands, tools decide, templates speak</li>
+        <li><b>Built:</b> voice + visual canvas, explicit approval, 10-min fare hold, in-app UPI, failure lab, credential guard, grounding validator</li>
+      </ul>
+      <p class="small">Sections 06, 07, 08</p>
+    </div>
+    <div class="box">
+      <div class="eyebrow">4 · Execution</div>
+      <h4 style="margin-top:4pt">How do we build it, prove it and decide to scale it?</h4>
+      <ul style="font-size:8.5pt;margin-top:4pt">
+        <li>KPI tree, experiment design with power estimate, kill criteria, pre-mortem</li>
+        <li>13-week plan with exit gates; operating model across engineering, risk and support</li>
+        <li><b>Built:</b> working prototype, 27 automated tests, 30-utterance NLU eval, live journey analytics, 2-minute walkthrough</li>
+      </ul>
+      <p class="small">Sections 09, 10, 12</p>
+    </div>
+  </div>
+
+  <h3>What has already been built</h3>
+  <table>
+    <tr><th style="width:26%">Parameter</th><th>Shipped in the prototype</th><th style="width:22%">Evidence</th></tr>
+    <tr><td><b>User personas</b></td><td>One-sentence Hinglish booking; asks only for missing details; read-back with fare and refund rule; cheapest and fastest named across modes</td><td>Walkthrough video, scenes 1–3</td></tr>
+    <tr><td><b>Go-to-market</b></td><td>"Bol ke book karo" entry copy; six one-tap demo scenarios; funnel and adoption events from first turn to confirmed ticket</td><td>Insights panel</td></tr>
+    <tr><td><b>Product design</b></td><td>Voice + visual canvas; explicit approval; fare hold; in-app UPI; payment failure lab; 3-way reconciliation; refund quote before cancel</td><td>Walkthrough video, scenes 4–6</td></tr>
+    <tr><td><b>Execution</b></td><td>Context harness with guards and grounding; Gemini with offline fallback; 27 tests; NLU eval set; measured latency p50/p90</td><td>Repo, test suite</td></tr>
+  </table>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>3</span></div>
+</div>
+
 <!-- ================================ 02 PR/FAQ ================================ -->
 <div class="page">
   <div class="sec-head"><span class="n">02</span><h2>Working backwards</h2><span class="kick">Press release &amp; FAQ</span></div>
@@ -196,7 +258,7 @@
       <p><b>Why trains first?</b><br>Hypothesis: the highest share of first-time and Hindi-first bookers, and the most form-heavy flow.</p>
     </div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>3</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>4</span></div>
 </div>
 
 <!-- ================================ 03 PROBLEM ================================ -->
@@ -226,12 +288,12 @@
   </table>
 
   <div class="note"><b>What we know vs what we assume.</b> Known: the booking form is multi-step, and debit-without-ticket is a recurring failure mode in UPI commerce. Assumed, to validate in week one: which step leaks most for Hindi-first users, and the share of support volume that is payment-related.</div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>4</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>5</span></div>
 </div>
 
 <!-- ================================ 04 INSIGHTS ================================ -->
 <div class="page">
-  <div class="sec-head"><span class="n">04</span><h2>Customer insights</h2><span class="kick">Who struggles, and what they need</span></div>
+  <div class="sec-head"><span class="n">04</span><h2>User personas and insights</h2><span class="kick">Who struggles, and what they need</span></div>
 
   <h3 style="margin-top:0">Three customers, three jobs</h3>
   <div class="g3">
@@ -247,8 +309,16 @@
   <div class="insight"><div class="i">4</div><div><b>After payment, silence is the enemy.</b> A clear "no money was taken" or "your refund has started" prevents most follow-up contacts. <i>So what:</i> payment failures are handled in-conversation, with a specific next step.</div></div>
   <div class="insight"><div class="i">5</div><div><b>Trust is earned by what the assistant refuses to do.</b> Never asking for an OTP, never booking without consent, never guessing a fare. <i>So what:</i> the guardrails are visible in the experience, not hidden in the backend.</div></div>
 
+  <h3>What each persona gets</h3>
+  <table>
+    <tr><th style="width:20%">Persona</th><th style="width:36%">Pain we design against</th><th>What we built for them</th></tr>
+    <tr><td><b>Family booker</b></td><td>Fear of booking the wrong date; unfamiliar station codes</td><td>Hindi/Hinglish one-sentence input, colloquial city names, read-back + explicit "yes"</td></tr>
+    <tr><td><b>Busy regular</b></td><td>Comparing modes across tabs; filters resetting</td><td>Cross-mode results naming fastest and cheapest; "sabse sasta?", "one day later?" without restarting</td></tr>
+    <tr><td><b>Anxious payer</b></td><td>Money debited, no ticket, no answer</td><td>In-chat 3-way reconciliation: ticket issued or full auto-refund, with an audit trail</td></tr>
+  </table>
+
   <div class="note"><b>Research plan to validate:</b> 15 interviews in Hindi with Tier-2/3 train bookers (including people who book for others), a review of 200 support transcripts tagged "payment", and search-log mining for colloquial city names and code-switching.</div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>5</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>6</span></div>
 </div>
 
 <!-- ================================ 05 STRATEGY ================================ -->
@@ -299,12 +369,12 @@
     <li><b>Autonomous "book it for me":</b> no booking without explicit, per-transaction consent.</li>
     <li><b>A general travel chatbot:</b> open-ended chat adds cost and risk without a conversion story.</li>
   </ul>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>6</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>7</span></div>
 </div>
 
 <!-- ================================ 06 PRODUCT ================================ -->
 <div class="page">
-  <div class="sec-head"><span class="n">06</span><h2>The product</h2><span class="kick">Principles, experience, scope</span></div>
+  <div class="sec-head"><span class="n">06</span><h2>Product design</h2><span class="kick">Principles, experience, scope</span></div>
 
   <div class="g3">
     <div class="box"><h4>Ask only what's missing</h4><p>One sentence can fill every field. Confirm what was heard, ask for one thing.</p></div>
@@ -331,7 +401,7 @@
     <tr><td><b>Next</b></td><td>Buses · return journeys · streaming speech in and out · saved co-travellers</td></tr>
     <tr><td><b>Later</b></td><td>Flights and hotels · Marathi, Tamil, Bengali · berth preference by voice · Tatkal (only after trust metrics hold)</td></tr>
   </table>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>7</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>8</span></div>
 </div>
 
 <!-- ================================ 07 SYSTEM ================================ -->
@@ -383,7 +453,7 @@
       </table>
     </div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>8</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>9</span></div>
 </div>
 
 <!-- ================================ 08 PAYMENTS ================================ -->
@@ -419,7 +489,7 @@
     <div class="box"><h4>Personal data</h4><p>Redaction before the model, no audio stored, keys server-side. Open: consent notice, retention, provider data residency.</p></div>
     <div class="box"><h4>Model risk</h4><p>No generated money values, deterministic consent, per-turn audit logs. Open: model change-management process.</p></div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>9</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>10</span></div>
 </div>
 
 <!-- ================================ 09 MEASUREMENT ================================ -->
@@ -460,7 +530,7 @@
     <div class="box"><h4>Online health</h4><p>Fallback share, latency p50/p90 per stage, ungrounded-claim blocks per 1k turns.</p></div>
     <div class="box"><h4>Human review</h4><p>Weekly review of sampled conversations with support and risk, feeding failures back into the golden set.</p></div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>10</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>11</span></div>
 </div>
 
 <!-- ================================ 10 PRE-MORTEM ================================ -->
@@ -488,12 +558,69 @@
     <div class="box"><h4>Correct over charming</h4><p>Templated replies feel less magical than free generation. Next to money, predictability beats personality; personality can live in small talk.</p></div>
     <div class="box"><h4>Narrow over broad</h4><p>Trains, Hindi, one-way first. A narrow pilot gives a clean read on one hypothesis; a broad one gives noise and more ways to fail.</p></div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>11</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>12</span></div>
 </div>
 
-<!-- ================================ 11 ROADMAP ================================ -->
+
+<!-- ================================ 11 GTM ================================ -->
 <div class="page">
-  <div class="sec-head"><span class="n">11</span><h2>Roadmap</h2><span class="kick">Learn → build → prove → scale</span></div>
+  <div class="sec-head"><span class="n">11</span><h2>Go-to-market</h2><span class="kick">Reach, trust, first booking</span></div>
+  <p class="thesis">Paytm doesn't need to buy distribution: the customer is already in the app to pay. Go-to-market is about the right entry point, a trust message that lands in Hindi, and a first booking that works.</p>
+
+  <div class="g2">
+    <div>
+      <h3 style="margin-top:0">Beachhead segment</h3>
+      <p style="font-size:9pt"><b>Hindi-first Android users in Hindi-belt states</b> who already pay with Paytm UPI but have never booked travel on Paytm, plus <b>existing train bookers</b> who contact support after paying. <span class="pill p-a">Assumption</span></p>
+      <h3>Positioning</h3>
+      <p style="font-size:9pt">For travellers who find booking forms confusing, Paytm Travel lets you <b>book a train in one sentence</b> and pay with Paytm UPI. Unlike other travel apps, it <b>reads everything back before booking</b> and <b>fixes payment problems in the same conversation</b>.</p>
+    </div>
+    <div>
+      <h3 style="margin-top:0">Message pillars</h3>
+      <table>
+        <tr><th>Pillar</th><th>In-app line</th></tr>
+        <tr><td><b>Simplicity</b></td><td>"Bol ke book karo"</td></tr>
+        <tr><td><b>Control</b></td><td>"Aapki 'haan' ke baad hi booking"</td></tr>
+        <tr><td><b>Safety</b></td><td>"Hum kabhi PIN ya OTP nahi poochenge"</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <h3>Entry points and channels</h3>
+  <table>
+    <tr><th style="width:26%">Entry point</th><th>Moment</th><th style="width:26%">Why it converts</th></tr>
+    <tr><td><b>Order details: "Talk to us"</b></td><td>After booking: status, cancellation, money debited</td><td>Launches support first; lowest risk, highest intent</td></tr>
+    <tr><td><b>Payment-failure screen</b></td><td>Right after a failed or pending UPI payment</td><td>Resolves anxiety in the moment it peaks</td></tr>
+    <tr><td><b>Mic in Travel search</b></td><td>Search bar with example sentence as placeholder</td><td>Zero new navigation; shows what to say</td></tr>
+    <tr><td><b>Travel home banner</b></td><td>Hindi-language users, Hindi-belt states</td><td>Targets the beachhead only</td></tr>
+    <tr><td><b>Seasonal push</b></td><td>Before peak travel periods, once pilot gates pass</td><td>Scales demand only after trust is proven</td></tr>
+  </table>
+
+  <div class="g2">
+    <div>
+      <h3>Adoption funnel</h3>
+      <table>
+        <tr><th>Stage</th><th>Metric</th></tr>
+        <tr><td>Discover</td><td>Entry-point tap rate</td></tr>
+        <tr><td>Activate</td><td>Sessions with ≥1 voice turn</td></tr>
+        <tr><td>Convert</td><td>First confirmed voice booking</td></tr>
+        <tr><td>Retain</td><td>Repeat voice booking in 60 days</td></tr>
+      </table>
+    </div>
+    <div>
+      <h3>Economics and readiness</h3>
+      <ul style="font-size:8.6pt">
+        <li><b>No voice fee:</b> same convenience fee as the form, so voice never costs the customer more</li>
+        <li><b>Unit cost:</b> model + speech cost per confirmed booking tracked against the convenience fee; support deflection counted as savings</li>
+        <li><b>Readiness:</b> support trained on agent flows; risk sign-off; vendor SLAs; first-run tip with an example sentence</li>
+      </ul>
+    </div>
+  </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>13</span></div>
+</div>
+
+<!-- ================================ 12 EXECUTION ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">12</span><h2>Execution plan</h2><span class="kick">Learn → build → prove → scale</span></div>
 
   <table>
     <tr><th style="width:15%">Weeks</th><th style="width:22%">Phase</th><th>Outcomes</th><th style="width:24%">Exit gate</th></tr>
@@ -519,7 +646,7 @@
   </ul>
 
   <div class="note" style="margin-top:12pt"><b>Beyond Travel.</b> The same harness (intent and slot extraction, grounded answers, payment-safe guardrails, in-conversation failure recovery) transfers directly to bill payments, recharges and insurance servicing. The investment compounds across the app.</div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>12</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>14</span></div>
 </div>
 
 <!-- ================================ APPENDIX ================================ -->
@@ -559,7 +686,7 @@
       </table>
     </div>
   </div>
-  <div class="foot"><span>Say it once. Book it safely.</span><span>13</span></div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>15</span></div>
 </div>
 
 </body>

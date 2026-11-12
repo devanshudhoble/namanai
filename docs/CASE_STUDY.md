@@ -16,6 +16,17 @@
 
 ---
 
+## At a glance: four parameters
+
+| Parameter | Question it answers | Covered in |
+|---|---|---|
+| **User personas** | Who is this for, and what job are they hiring it to do? | §1 Problem, §2 Users |
+| **Go-to-market** | How does it reach the first users, and win them? | §7 Experiment & rollout, §7a Go-to-market |
+| **Product design** | What does the customer experience, and what keeps it safe? | §3 Principles, §4 Focus areas, §5 Context engineering |
+| **Execution** | How do we build it, prove it and decide to scale it? | §6 Metrics, §7 Rollout, §9 Evaluation, §10 First 90 days |
+
+---
+
 ## 1. Problem
 
 ### What the customer is trying to do
@@ -150,6 +161,32 @@ This is what lets a PM promise legal and compliance that the agent cannot invent
 | 2 | 10%, add buses | Conversion ≥ control |
 | 3 | Flights + hotels, more languages (Marathi, Tamil, Bengali via Sarvam) | Per-language accuracy bar |
 | 4 | Post-booking voice support (status, cancel, refund) for all bookings | Support ticket deflection |
+
+---
+
+## 7a. Go-to-market
+
+**Beachhead:** Hindi-first Android users in Hindi-belt states who already pay with Paytm UPI but have never booked travel on Paytm, plus existing train bookers who contact support after paying (assumption to validate).
+
+**Positioning:** For travellers who find booking forms confusing, Paytm Travel lets you book a train in one sentence and pay with Paytm UPI. Unlike other travel apps, it reads everything back before booking and fixes payment problems in the same conversation.
+
+| Message pillar | In-app line |
+|---|---|
+| Simplicity | "Bol ke book karo" |
+| Control | "Aapki 'haan' ke baad hi booking" |
+| Safety | "Hum kabhi PIN ya OTP nahi poochenge" |
+
+| Entry point | Moment | Why it converts |
+|---|---|---|
+| Order details: "Talk to us" | After booking: status, cancellation, money debited | Support launches first; lowest risk, highest intent |
+| Payment-failure screen | Right after a failed or pending UPI payment | Resolves anxiety when it peaks |
+| Mic in Travel search | Search bar with an example sentence as placeholder | No new navigation; shows what to say |
+| Travel home banner | Hindi-language users in Hindi-belt states | Targets the beachhead only |
+| Seasonal push | Before peak travel periods, once pilot gates pass | Scales demand only after trust is proven |
+
+**Adoption funnel:** entry-point tap rate → sessions with ≥1 voice turn → first confirmed voice booking → repeat voice booking within 60 days.
+
+**Economics and readiness:** no voice fee (same convenience fee as the form); model and speech cost per confirmed booking tracked against the convenience fee, with support deflection counted as savings; support trained on agent flows, risk sign-off and vendor SLAs before launch.
 
 ---
 

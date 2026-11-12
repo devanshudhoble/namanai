@@ -18,6 +18,19 @@ A working prototype plus a product case study, built around one idea: **with mon
 
 ---
 
+## Case study: four parameters
+
+| Parameter | What the case study covers | What is built in this repo |
+|---|---|---|
+| **1. User personas** | Family booker (Hindi-first, Tier-2/3), busy regular (metro, price-sensitive), anxious payer (post-payment). Jobs to be done, five insights with a "so what", and what each persona gets | One-sentence Hinglish booking, asks only for missing details, read-back before booking, cheapest and fastest across modes, in-chat payment recovery |
+| **2. Go-to-market** | Beachhead segment, positioning, Hindi message pillars ("Bol ke book karo"), in-app entry points, launch sequence, adoption funnel, unit economics | Hindi/Hinglish entry copy, six one-tap demo scenarios, funnel and adoption events from first turn to ticket, 2-minute walkthrough |
+| **3. Product design** | Six principles, turn-by-turn conversation design, Now/Next/Later scope, context engineering harness, payment failure design | Voice + visual canvas, explicit approval, 10-min fare hold, in-app UPI, failure lab, 3-way reconciliation, refund quote, credential guard, grounding validator |
+| **4. Execution** | KPI tree, experiment design with power estimate, kill criteria, pre-mortem, 13-week plan with exit gates, operating model | Working prototype, Gemini with offline fallback, 27 automated tests, 30-utterance NLU eval, live latency p50/p90 |
+
+Full detail in the [product strategy PDF](docs/Paytm_Travel_Voice_Agent_Case_Study.pdf) (sections 03–12) and [docs/CASE_STUDY.md](docs/CASE_STUDY.md).
+
+---
+
 ## Product focus areas
 
 Each area below is framed the way it would be run in a product team: the customer problem, what the prototype does about it, and the metric it is accountable to.
