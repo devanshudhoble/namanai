@@ -2,475 +2,565 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Voice-first booking for Paytm Travel: Product Case Study</title>
+<title>Say it once. Book it safely. Voice booking for Paytm Travel</title>
 <style>
-  @page { size: A4; margin: 18mm 17mm 18mm 17mm; }
+  @page { size: A4; margin: 0; }
   :root {
-    --ink: #1b2430; --muted: #5b6573; --rule: #d9dee5; --navy: #0b2a4a; --accent: #0f6fb5;
-    --soft: #f3f6f9; --green: #1d7a4f; --amber: #9a6200; --red: #a5322d;
+    --ink:#16202c; --muted:#5f6b7a; --faint:#8a94a3; --rule:#dde2e8; --bg:#f4f6f9;
+    --navy:#0a2540; --blue:#0b63c5; --sky:#e8f1fb; --green:#127a4a; --gsoft:#e6f4ec;
+    --amber:#9a5b00; --asoft:#fdf2df; --red:#b03a2e; --rsoft:#fbe9e7;
   }
-  * { box-sizing: border-box; }
-  html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  body { margin: 0; color: var(--ink); font: 10.2pt/1.5 "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
-  h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; color: var(--navy); font-weight: 700; }
-  h2 { font-size: 17pt; margin: 0 0 4pt; padding-top: 2pt; }
-  h2 .num { color: var(--accent); margin-right: 6pt; }
-  h3 { font-size: 11.5pt; margin: 14pt 0 4pt; }
-  p { margin: 0 0 7pt; }
-  .lede { color: var(--muted); font-size: 10.5pt; margin-bottom: 12pt; border-bottom: 1px solid var(--rule); padding-bottom: 8pt; }
-  section { break-before: page; }
-  .keep { break-inside: avoid; }
-  table { width: 100%; border-collapse: collapse; margin: 6pt 0 10pt; font-size: 9pt; break-inside: avoid; }
-  th { text-align: left; background: var(--navy); color: #fff; font-weight: 600; padding: 5pt 6pt; }
-  td { border-bottom: 1px solid var(--rule); padding: 5pt 6pt; vertical-align: top; }
-  tr:nth-child(even) td { background: #fafbfc; }
-  .tag { display: inline-block; font-size: 7.5pt; font-weight: 700; letter-spacing: .04em; padding: 1pt 5pt; border-radius: 3pt; text-transform: uppercase; }
-  .t-real { background: #e3f3ea; color: var(--green); } .t-sim { background: #fdf1dc; color: var(--amber); }
-  .t-hyp { background: #e8f0f8; color: var(--accent); } .t-high { background: #fbe5e3; color: var(--red); }
-  .callout { background: var(--soft); border-left: 3pt solid var(--accent); padding: 8pt 10pt; margin: 8pt 0 10pt; break-inside: avoid; }
-  .callout b { color: var(--navy); }
-  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10pt; }
-  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8pt; }
-  .card { border: 1px solid var(--rule); border-radius: 4pt; padding: 8pt 9pt; break-inside: avoid; }
-  .card h4 { margin: 0 0 3pt; font-size: 9.5pt; color: var(--navy); }
-  .card p { font-size: 9pt; margin: 0; color: var(--ink); }
-  .kpi { text-align: left; }
-  .kpi .v { font-family: Georgia, serif; font-size: 18pt; color: var(--navy); line-height: 1.1; }
-  .kpi .l { font-size: 8.5pt; color: var(--muted); }
-  ul { margin: 0 0 8pt; padding-left: 14pt; } li { margin-bottom: 2.5pt; }
-  .small { font-size: 8.5pt; color: var(--muted); }
-  .fig { border: 1px solid var(--rule); border-radius: 4pt; padding: 8pt; margin: 6pt 0 4pt; break-inside: avoid; }
-  .figcap { font-size: 8.5pt; color: var(--muted); margin: 3pt 0 10pt; }
-  img.shot { width: 100%; border: 1px solid var(--rule); border-radius: 3pt; }
+  *{box-sizing:border-box}
+  html{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  body{margin:0;color:var(--ink);font:9.6pt/1.55 "Segoe UI","Helvetica Neue",Arial,sans-serif}
+  .page{width:210mm;min-height:297mm;padding:20mm 18mm 18mm;position:relative;break-after:page;overflow:hidden}
+  .page:last-child{break-after:auto}
+  .serif{font-family:Georgia,"Times New Roman",serif}
+  h1,h2,h3{font-family:Georgia,"Times New Roman",serif;color:var(--navy);margin:0}
+  .eyebrow{font-size:7.6pt;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--blue)}
+  .sec-head{display:flex;align-items:baseline;gap:10pt;border-bottom:1.5pt solid var(--navy);padding-bottom:6pt;margin-bottom:12pt}
+  .sec-head .n{font-family:Georgia,serif;font-size:26pt;color:var(--blue);line-height:1}
+  .sec-head h2{font-size:18pt;line-height:1.15}
+  .sec-head .kick{margin-left:auto;font-size:7.6pt;letter-spacing:.14em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .thesis{font-family:Georgia,serif;font-size:12pt;line-height:1.45;color:var(--navy);margin:0 0 12pt}
+  h3{font-size:11pt;margin:13pt 0 5pt}
+  p{margin:0 0 7pt}
+  .muted{color:var(--muted)} .small{font-size:8.2pt;color:var(--muted)}
+  table{width:100%;border-collapse:collapse;font-size:8.5pt;margin:4pt 0 8pt;break-inside:avoid}
+  th{text-align:left;font-size:7.4pt;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;border-bottom:1.2pt solid var(--navy);padding:4pt 6pt}
+  td{border-bottom:1px solid var(--rule);padding:4.5pt 6pt;vertical-align:top}
+  td b{color:var(--navy)}
+  ul{margin:0 0 7pt;padding-left:13pt} li{margin-bottom:2.5pt}
+  .g2{display:grid;grid-template-columns:1fr 1fr;gap:12pt}
+  .g3{display:grid;grid-template-columns:repeat(3,1fr);gap:9pt}
+  .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:8pt}
+  .box{border:1px solid var(--rule);border-radius:3pt;padding:8pt 9pt;break-inside:avoid;background:#fff}
+  .box h4{margin:0 0 3pt;font-size:8.8pt;color:var(--navy)}
+  .box p{margin:0;font-size:8.5pt}
+  .note{background:var(--bg);border-left:2.5pt solid var(--blue);padding:7pt 10pt;margin:8pt 0;break-inside:avoid;font-size:9pt}
+  .decision{background:var(--navy);color:#fff;border-radius:3pt;padding:10pt 12pt;margin:10pt 0;break-inside:avoid}
+  .decision .eyebrow{color:#8fc1ff}
+  .decision p{margin:4pt 0 0;font-size:9.4pt}
+  .pill{display:inline-block;font-size:6.8pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1pt 5pt;border-radius:2pt;vertical-align:1px}
+  .p-k{background:var(--gsoft);color:var(--green)} .p-a{background:var(--sky);color:var(--blue)} .p-h{background:var(--rsoft);color:var(--red)} .p-m{background:var(--asoft);color:var(--amber)}
+  .stat .v{font-family:Georgia,serif;font-size:21pt;color:var(--navy);line-height:1.05}
+  .stat .l{font-size:8pt;color:var(--muted);margin-top:2pt}
+  .insight{display:grid;grid-template-columns:22pt 1fr;gap:6pt;margin-bottom:8pt;break-inside:avoid}
+  .insight .i{font-family:Georgia,serif;font-size:17pt;color:var(--blue);line-height:1}
+  .insight b{color:var(--navy)}
+  .quote{font-family:Georgia,serif;font-size:11pt;font-style:italic;color:var(--navy);border-left:2.5pt solid var(--blue);padding:2pt 0 2pt 10pt;margin:8pt 0}
+  .foot{position:absolute;left:18mm;right:18mm;bottom:9mm;display:flex;justify-content:space-between;font-size:7pt;color:var(--faint);border-top:1px solid var(--rule);padding-top:4pt}
   /* cover */
-  .cover { height: 257mm; display: flex; flex-direction: column; justify-content: space-between; }
-  .cover .kicker { font-size: 9pt; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
-  .cover h1 { font-size: 30pt; line-height: 1.12; margin: 10pt 0 10pt; }
-  .cover .sub { font-size: 12.5pt; color: var(--muted); max-width: 140mm; }
-  .cover .meta td { border: 0; padding: 2pt 10pt 2pt 0; background: none !important; font-size: 9.5pt; }
-  .cover .meta td:first-child { color: var(--muted); width: 32mm; }
-  .bar { height: 4pt; width: 60mm; background: linear-gradient(90deg, var(--navy), var(--accent)); margin-top: 16pt; }
-  .toc td { border: 0; padding: 2.5pt 0; background: none !important; font-size: 9.5pt; }
-  .toc td:last-child { text-align: right; color: var(--muted); }
-  /* metric tree */
-  .tree { display: grid; grid-template-columns: 1fr 1.25fr 1.4fr; gap: 6pt; align-items: center; font-size: 8.6pt; }
-  .node { border: 1px solid var(--rule); border-radius: 4pt; padding: 5pt 6pt; background: #fff; }
-  .node.ns { background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 600; }
-  .node.g { border-color: #e7c7c4; background: #fdf6f5; }
-  .col { display: flex; flex-direction: column; gap: 5pt; }
-  .dense table { font-size: 8.3pt; margin: 4pt 0 7pt; } .dense td, .dense th { padding: 3.2pt 5pt; }
-  .dense h3 { margin: 9pt 0 3pt; } .dense .callout { padding: 6pt 9pt; margin: 6pt 0 6pt; }
-  /* funnel */
-  .funnel div { margin: 0 auto 3pt; padding: 4pt 6pt; color: #fff; font-size: 8.5pt; text-align: center; border-radius: 2pt; }
+  .cover{background:var(--navy);color:#fff;padding:0}
+  .cover .top{padding:26mm 20mm 0}
+  .cover .eyebrow{color:#8fc1ff}
+  .cover h1{color:#fff;font-size:40pt;line-height:1.04;margin:14pt 0 12pt;letter-spacing:-.01em}
+  .cover .dek{font-size:12.5pt;line-height:1.5;color:#c9d6e6;max-width:150mm}
+  .cover .band{margin:22mm 20mm 0;display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid #2f4a68;border-bottom:1px solid #2f4a68}
+  .cover .band > div{padding:12pt 10pt 12pt 0}
+  .cover .band .v{font-family:Georgia,serif;font-size:24pt;color:#fff}
+  .cover .band .l{font-size:8.4pt;color:#a9bbd0;margin-top:3pt;padding-right:10pt}
+  .cover .map{margin:16mm 20mm 0;display:grid;grid-template-columns:1fr 1fr;column-gap:20pt;row-gap:5pt;font-size:9pt;color:#c9d6e6}
+  .cover .map span{color:#8fc1ff;font-family:Georgia,serif;margin-right:7pt}
+  .cover .bottom{position:absolute;left:20mm;right:20mm;bottom:16mm;display:flex;justify-content:space-between;font-size:8pt;color:#8ea3bb;border-top:1px solid #2f4a68;padding-top:7pt}
+  /* PR */
+  .pr{border:1px solid var(--rule);padding:14pt 16pt;border-radius:3pt}
+  .pr h3{font-size:15pt;margin:4pt 0 3pt}
+  .pr .sub{font-style:italic;color:var(--muted);margin-bottom:8pt}
+  /* diagrams */
+  .funnel .row{display:grid;grid-template-columns:34mm 1fr 30mm;align-items:center;gap:8pt;margin-bottom:4pt;font-size:8.4pt}
+  .funnel .bar{height:13pt;background:var(--blue);border-radius:1.5pt;opacity:.9}
+  .funnel .bar.leak{background:var(--red)}
+  .matrix{position:relative;height:66mm;border-left:1.2pt solid var(--navy);border-bottom:1.2pt solid var(--navy);margin:6pt 0 18pt 14pt;background:
+    linear-gradient(to right,transparent 49.8%,var(--rule) 49.8%,var(--rule) 50.2%,transparent 50.2%),
+    linear-gradient(to bottom,transparent 49.6%,var(--rule) 49.6%,var(--rule) 50.4%,transparent 50.4%)}
+  .matrix .dot{position:absolute;transform:translate(-50%,-50%);font-size:7.6pt;font-weight:600;color:var(--navy);text-align:center;width:36mm}
+  .matrix .dot i{display:block;width:9pt;height:9pt;border-radius:50%;background:var(--blue);margin:0 auto 2pt}
+  .matrix .dot.pick i{background:var(--green);box-shadow:0 0 0 3pt var(--gsoft)}
+  .matrix .ax{position:absolute;font-size:7pt;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);font-weight:700}
+  .matrix .q{position:absolute;font-size:7pt;color:var(--faint);font-style:italic}
+  .arch{display:grid;grid-template-columns:repeat(5,1fr);gap:0;align-items:stretch;margin:6pt 0}
+  .arch .st{border:1px solid var(--rule);border-radius:3pt;padding:6pt;font-size:7.8pt;background:#fff;position:relative;margin-right:10pt}
+  .arch .st:not(:last-child)::after{content:"→";position:absolute;right:-10pt;top:40%;color:var(--blue);font-weight:700}
+  .arch .st b{display:block;color:var(--navy);font-size:8.2pt;margin-bottom:2pt}
+  .arch .st.llm{background:var(--sky);border-color:#b9d4f2}
+  .arch .st.guard{background:var(--rsoft);border-color:#efc6c0}
+  .tree{display:grid;grid-template-columns:1fr 1.3fr 1.45fr;gap:7pt;align-items:center;font-size:8.2pt}
+  .tree .col{display:flex;flex-direction:column;gap:5pt}
+  .node{border:1px solid var(--rule);border-radius:3pt;padding:5pt 7pt;background:#fff}
+  .node.ns{background:var(--navy);color:#fff;border-color:var(--navy)}
+  .node.gr{background:var(--rsoft);border-color:#efc6c0}
+  .dtree{font-size:8.2pt}
+  .dtree .lvl{display:grid;gap:6pt;margin-bottom:6pt}
+  .dtree .q{background:var(--navy);color:#fff;border-radius:3pt;padding:5pt 8pt;text-align:center}
+  .dtree .a{border:1px solid var(--rule);border-radius:3pt;padding:5pt 7pt;background:#fff}
+  .dtree .a.ok{background:var(--gsoft);border-color:#bfe2cd}
+  .dtree .a.bad{background:var(--rsoft);border-color:#efc6c0}
+  .story .turn{display:grid;grid-template-columns:44mm 1fr;gap:10pt;padding:5pt 0;border-bottom:1px solid var(--rule);font-size:8.6pt;break-inside:avoid}
+  .story .u{font-family:Georgia,serif;font-style:italic;color:var(--navy)}
+  img.shot{width:100%;border:1px solid var(--rule);border-radius:2pt}
+  .cap{font-size:7.6pt;color:var(--muted);margin:3pt 0 0}
 </style>
 </head>
 <body>
 
-<!-- ============================ COVER ============================ -->
-<div class="cover">
-  <div>
-    <div class="kicker">Product Case Study · AI Product Management · Fintech</div>
-    <h1>Voice-first booking for Paytm Travel</h1>
-    <div class="sub">How an AI agent can lift booking conversion for first-time and Hindi-first travellers, and the harness that makes it safe to put next to money.</div>
-    <div class="bar"></div>
+<!-- ================================ COVER ================================ -->
+<div class="page cover">
+  <div class="top">
+    <div class="eyebrow">Product Strategy · Travel · Conversational AI</div>
+    <h1>Say it once.<br>Book it safely.</h1>
+    <div class="dek">A voice agent for train and bus booking in Paytm Travel: the customer problem, the strategic bet, the product, and the system design that lets a language model work next to money without ever being trusted with it.</div>
   </div>
-
-  <table class="toc" style="width: 120mm">
-    <tr><td>Executive summary</td><td>2</td></tr>
-    <tr><td>1&nbsp;&nbsp;Context: why Paytm, why now</td><td>3</td></tr>
-    <tr><td>2&nbsp;&nbsp;Product sense: users, problems, prioritisation</td><td>4</td></tr>
-    <tr><td>3&nbsp;&nbsp;Solution and MVP scope</td><td>6</td></tr>
-    <tr><td>4&nbsp;&nbsp;AI system design: context engineering and the harness</td><td>7</td></tr>
-    <tr><td>5&nbsp;&nbsp;The fintech layer: payments, failures, refunds, compliance</td><td>8</td></tr>
-    <tr><td>6&nbsp;&nbsp;Metrics and KPI tree</td><td>9</td></tr>
-    <tr><td>7&nbsp;&nbsp;Experiment design and rollout</td><td>10</td></tr>
-    <tr><td>8&nbsp;&nbsp;Risks, trade-offs and what I would not build</td><td>11</td></tr>
-    <tr><td>9&nbsp;&nbsp;First 90 days</td><td>12</td></tr>
-    <tr><td>10&nbsp;Prototype evidence</td><td>13</td></tr>
-  </table>
-
-  <div>
-    <table class="meta" style="width:auto">
-      <tr><td>Prepared by</td><td><b>Devanshu Dhoble</b></td></tr>
-      <tr><td>For</td><td>Associate Product Manager (AI), Paytm Travel</td></tr>
-      <tr><td>Date</td><td>November 2026</td></tr>
-      <tr><td>Prototype</td><td>github.com/devanshudhoble/namanai</td></tr>
-    </table>
-    <p class="small" style="margin-top:10pt">Independent work, not affiliated with Paytm. Market statements marked <span class="tag t-hyp">Hypothesis</span> are assumptions I would validate with internal data in week one. Prototype travel inventory and payments are sandboxed; no real money moves.</p>
+  <div class="band">
+    <div><div class="v">1 turn</div><div class="l">from a complete Hinglish sentence to bookable options</div></div>
+    <div><div class="v">0</div><div class="l">prices, PNRs or refunds generated by the model, by construction</div></div>
+    <div><div class="v">5 of 5</div><div class="l">payment failure patterns resolved inside the conversation</div></div>
   </div>
+  <div class="map">
+    <div><span>01</span>Executive summary</div>
+    <div><span>07</span>Context engineering &amp; the harness</div>
+    <div><span>02</span>Working backwards: press release &amp; FAQ</div>
+    <div><span>08</span>Payments, failures and refunds</div>
+    <div><span>03</span>Problem diagnosis</div>
+    <div><span>09</span>Measurement and experiment</div>
+    <div><span>04</span>Customer insights</div>
+    <div><span>10</span>Pre-mortem and risks</div>
+    <div><span>05</span>Strategy and prioritisation</div>
+    <div><span>11</span>Roadmap</div>
+    <div><span>06</span>The product</div>
+    <div><span>A</span>Appendix: prototype and assumptions</div>
+  </div>
+  <div class="bottom"><span>Devanshu Dhoble</span><span>November 2026</span></div>
 </div>
 
-<!-- ============================ EXEC SUMMARY ============================ -->
-<section>
-  <h2>Executive summary</h2>
-  <p class="lede">One page for a reader who stops here.</p>
+<!-- ================================ 01 EXEC ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">01</span><h2>Executive summary</h2><span class="kick">The one-page version</span></div>
+  <p class="thesis">Travel inventory is a commodity and price is a race to the bottom. The durable advantage is in who can book, and how safely they can pay. A voice agent built on Paytm's in-app UPI wins on both.</p>
 
-  <div class="grid2">
+  <div class="g3">
+    <div class="box"><div class="eyebrow">Situation</div><p style="margin-top:4pt">Every major platform sells the same IRCTC trains and the same buses at near-identical prices. Booking UX across the category is still a multi-screen form, designed for confident, English-first metro users.</p></div>
+    <div class="box"><div class="eyebrow">Complication</div><p style="margin-top:4pt">For Hindi-first and first-time online travellers, the form is the drop-off. After payment, "money deducted, ticket pending" turns the most anxious moment into a support ticket. LLMs can now understand these users, but cannot be trusted with fares or refunds.</p></div>
+    <div class="box"><div class="eyebrow">Resolution</div><p style="margin-top:4pt">A voice agent where the model only interprets intent. Prices, PNRs and refunds come from systems of record, every spoken number is verified, and payment is one tap on Paytm's own UPI, with the PIN never leaving the device.</p></div>
+  </div>
+
+  <h3>What I am recommending</h3>
+  <table>
+    <tr><th style="width:4%">#</th><th style="width:34%">Move</th><th>Why this, why now</th></tr>
+    <tr><td>1</td><td><b>Ship post-booking voice support first</b><br><span class="small">status, cancellation quote, money-deducted resolution</span></td><td>Lowest risk, clearest ROI (ticket deflection). It builds the agent harness, the eval set and customer trust before the agent touches a new booking.</td></tr>
+    <tr><td>2</td><td><b>Pilot voice booking for trains at 1%</b><br><span class="small">Hindi-belt states, Android, Travel home</span></td><td>Biggest upside, highest uncertainty. A narrow slice gives a clean read on conversion with bounded downside.</td></tr>
+    <tr><td>3</td><td><b>Treat the harness as the product, not the model</b></td><td>Models are interchangeable and getting cheaper. Domain guardrails, grounding and evals are what compound, and what risk and legal will sign off on.</td></tr>
+  </table>
+
+  <div class="g4" style="margin-top:6pt">
+    <div class="box stat"><div class="v">≤ 2</div><div class="l">median turns to options (target)</div></div>
+    <div class="box stat"><div class="v">≥ base</div><div class="l">search-to-booking conversion vs form</div></div>
+    <div class="box stat"><div class="v">≤ base</div><div class="l">wrong-booking rate (guardrail)</div></div>
+    <div class="box stat"><div class="v">0</div><div class="l">payment credentials reaching logs or a model</div></div>
+  </div>
+
+  <div class="decision">
+    <div class="eyebrow">Decision requested</div>
+    <p>Approve a two-week, 1% pilot of voice train booking against the existing form, with pre-agreed kill criteria (section 10), and staff post-booking voice support as the first production launch on the same stack.</p>
+  </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>2</span></div>
+</div>
+
+<!-- ================================ 02 PR/FAQ ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">02</span><h2>Working backwards</h2><span class="kick">Press release &amp; FAQ</span></div>
+  <p class="small" style="margin-bottom:8pt">Written as if on launch day, to force clarity on the customer benefit before the solution. Hypothetical.</p>
+
+  <div class="pr">
+    <div class="eyebrow">Press release · Bengaluru</div>
+    <h3>Paytm Travel now books your train when you just say where you're going</h3>
+    <div class="sub">Speak in Hindi, English or Hinglish. Confirm once. Pay with Paytm UPI. Done.</div>
+    <p>Today Paytm Travel launched voice booking for trains. Instead of picking stations, dates and classes across several screens, travellers can say one sentence, for example <i>"Mumbai se Nagpur agle Friday, do log, sleeper"</i>, and see the right options straight away.</p>
+    <p>The assistant asks only for what is missing, names the fastest and the cheapest options, and reads back the train, time, total fare and refund rule before booking anything. Nothing is booked without the traveller saying yes. Payment happens on the Paytm UPI screen, where the PIN is entered as usual and is never spoken.</p>
+    <p>If a payment goes wrong, the assistant fixes it in the same conversation. When money is debited but no ticket appears, it checks the bank, the booking ledger and the railway system in seconds, then either issues the ticket or starts a full refund.</p>
+    <div class="quote">"My mother can book her own ticket to Nagpur now. She just tells it where she's going and checks the price it reads back."</div>
+    <p class="small" style="margin:0">Illustrative customer quote</p>
+  </div>
+
+  <div class="g2" style="margin-top:10pt">
     <div>
-      <h3 style="margin-top:0">The problem</h3>
-      <p>Booking a train or bus on a phone is a form: station pickers, a calendar, passenger steppers, class filters, then a payment hand-off. For a first-time or Hindi-first traveller in a Tier-2/3 town, the form itself is the drop-off. After payment, the most anxious moment, "money deducted, ticket pending", becomes a support ticket instead of an answer.</p>
-      <h3>The insight</h3>
-      <p>People already describe trips in one sentence: <i>"Mumbai se Nagpur agle Friday, 2 log, train."</i> LLMs can now reliably turn that sentence into structured intent, but they cannot be trusted to state a fare, a PNR or a refund. The product opportunity is not "add a chatbot". It is <b>an agent that understands like an LLM and transacts like a payments system.</b></p>
+      <h3 style="margin-top:0">Customer FAQ</h3>
+      <p><b>What if it mishears me?</b><br>It always reads back the train, date, travellers and total before booking. Say "no" and nothing happens.</p>
+      <p><b>Will it ask for my UPI PIN or OTP?</b><br>Never. If you say one, it stops you and does not store it.</p>
+      <p><b>Can I cancel by voice?</b><br>Yes. It tells you the exact refund first, then cancels only if you confirm.</p>
     </div>
     <div>
-      <h3 style="margin-top:0">The proposal</h3>
-      <ul>
-        <li><b>Voice booking for trains,</b> starting in Hindi-belt states, Android, 1% of Travel traffic</li>
-        <li><b>Post-booking voice support</b> (status, cancellation, money deducted) as the low-risk fast follow, with clear ticket-deflection ROI</li>
-        <li><b>A context engineering harness</b> so the LLM only interprets. Tools decide prices, templates speak, and every spoken number is verified</li>
-      </ul>
-      <h3>Why Paytm wins this</h3>
-      <p>The customer is already inside a UPI app. Payment is one tap with the PIN on-device, not a hand-off to another app. That is a structural conversion advantage that pure-play OTAs don't have.</p>
+      <h3 style="margin-top:0">Internal FAQ</h3>
+      <p><b>Why not let the LLM answer directly?</b><br>A single invented fare or PNR is a trust and regulatory incident. The model interprets; systems of record answer.</p>
+      <p><b>What happens when the model is slow or down?</b><br>A deterministic engine with the same output contract takes over mid-conversation. Quality degrades; availability doesn't.</p>
+      <p><b>Why trains first?</b><br>Hypothesis: the highest share of first-time and Hindi-first bookers, and the most form-heavy flow.</p>
     </div>
   </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>3</span></div>
+</div>
 
-  <div class="grid3" style="margin-top:8pt">
-    <div class="card kpi"><div class="v">1 turn</div><div class="l">to reach options from a complete Hinglish sentence (prototype)</div></div>
-    <div class="card kpi"><div class="v">0</div><div class="l">model-generated prices or PNRs reach the customer, by design</div></div>
-    <div class="card kpi"><div class="v">27</div><div class="l">automated tests, plus a 30-utterance NLU eval in English, Hindi and Hinglish</div></div>
+<!-- ================================ 03 PROBLEM ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">03</span><h2>Problem diagnosis</h2><span class="kick">Where and why bookings leak</span></div>
+  <p class="thesis">The leak isn't one step. It is a form that assumes the customer already knows station codes, class names and fare rules, followed by a payment step that fails with no explanation.</p>
+
+  <h3>Illustrative booking funnel and where it leaks</h3>
+  <div class="funnel box">
+    <div class="row"><span>Opens Travel</span><div class="bar" style="width:100%"></div><span class="small">baseline</span></div>
+    <div class="row"><span>Search with results</span><div class="bar leak" style="width:78%"></div><span class="small">zero-result, spelling</span></div>
+    <div class="row"><span>Views options</span><div class="bar" style="width:62%"></div><span class="small">mode tabs, filters</span></div>
+    <div class="row"><span>Starts checkout</span><div class="bar leak" style="width:38%"></div><span class="small">refund uncertainty</span></div>
+    <div class="row"><span>Payment success</span><div class="bar leak" style="width:29%"></div><span class="small">timeouts, declines</span></div>
+    <div class="row"><span>Ticket issued</span><div class="bar" style="width:27%"></div><span class="small">debit, no ticket</span></div>
+    <p class="cap">Shape for illustration only; red bars mark where I expect the largest leaks. Week one replaces this with real funnel data by city tier and app language.</p>
   </div>
 
-  <div class="callout" style="margin-top:12pt"><b>The ask:</b> a two-week pilot (trains, Hindi belt, Android, 1% of Travel home traffic) against the existing form. Primary metric: search-to-booking conversion. Guardrails: wrong-booking rate and payment-related tickets per 1,000 bookings. Scale only if the primary metric is not worse <i>and</i> every guardrail holds.</div>
-</section>
-
-<!-- ============================ 1 CONTEXT ============================ -->
-<section>
-  <h2><span class="num">1</span>Context: why Paytm, why now</h2>
-  <p class="lede">The market is crowded on inventory and price. The gap is in usability for new online travellers and in post-payment trust.</p>
-
-  <h3>Where travel booking competition actually sits</h3>
+  <h3>Root-cause tree</h3>
   <table>
-    <tr><th style="width:28%">Dimension</th><th>State of the market</th><th style="width:26%">Implication</th></tr>
-    <tr><td>Inventory (IRCTC, airlines, bus operators)</td><td>Largely commoditised: every major platform sells the same trains and flights</td><td>Inventory is not a differentiator</td></tr>
-    <tr><td>Price</td><td>Convenience fees and offers converge quickly. Cashback-led growth is expensive to sustain</td><td>Price wars are a weak moat</td></tr>
-    <tr><td>Booking experience</td><td>Built for confident, English-first, metro users</td><td><b>Open gap</b> for Hindi-first and first-time users</td></tr>
-    <tr><td>Payment</td><td>OTAs hand off to a UPI app, adding a context switch and a failure point</td><td><b>Paytm advantage:</b> in-app UPI</td></tr>
-    <tr><td>Post-payment support</td><td>"Money deducted, ticket pending" resolved by ticket and wait</td><td><b>Open gap</b> for instant, honest resolution</td></tr>
+    <tr><th style="width:24%">Symptom</th><th style="width:38%">Root cause</th><th>Evidence I would pull</th></tr>
+    <tr><td><b>Abandon at search</b></td><td>Customer thinks in cities and colloquial names ("Bombay", "Jodpur"); the system wants station codes</td><td>Zero-result rate; query spelling clusters; app language</td></tr>
+    <tr><td><b>Abandon at compare</b></td><td>Train, bus and flight live in separate tabs; the cheaper mode is never seen</td><td>Cross-mode views per session; mode switches</td></tr>
+    <tr><td><b>Abandon at review</b></td><td>Refund and baggage rules are buried; the fare moves while the user hesitates</td><td>Time on review; fare-change errors</td></tr>
+    <tr><td><b>Fail at payment</b></td><td>App hand-off, bank timeouts, declines with no clear next step</td><td>Failure reasons; retry and recovery rate</td></tr>
+    <tr><td><b>Contact support after paying</b></td><td>Callback lost between bank and ledger; no self-serve answer</td><td>Top-20 support intents; time to resolution</td></tr>
   </table>
 
-  <h3>Why now</h3>
-  <div class="grid3">
-    <div class="card"><h4>Language understanding is ready</h4><p>Current LLMs handle Hinglish and code-switching well enough to extract trip details from one sentence. My prototype's Gemini path did this correctly on every utterance I tested.</p></div>
-    <div class="card"><h4>Indic voice is ready</h4><p>Indian neural TTS (for example Sarvam Bulbul) sounds local rather than robotic, which matters for trust in a money flow.</p></div>
-    <div class="card"><h4>Secrets are already on-device</h4><p>UPI keeps the PIN on the device, so a voice agent never needs to hear a credential. The rail for safe voice commerce already exists.</p></div>
+  <div class="note"><b>What we know vs what we assume.</b> Known: the booking form is multi-step, and debit-without-ticket is a recurring failure mode in UPI commerce. Assumed, to validate in week one: which step leaks most for Hindi-first users, and the share of support volume that is payment-related.</div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>4</span></div>
+</div>
+
+<!-- ================================ 04 INSIGHTS ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">04</span><h2>Customer insights</h2><span class="kick">Who struggles, and what they need</span></div>
+
+  <h3 style="margin-top:0">Three customers, three jobs</h3>
+  <div class="g3">
+    <div class="box"><div class="eyebrow">The family booker</div><h4 style="margin-top:4pt">"Book the right train for my family without asking my son."</h4><p>45, Wardha. Hindi-first. Books trains a few times a year, often through someone else or an agent. Fears the wrong date more than a higher price.</p></div>
+    <div class="box"><div class="eyebrow">The busy regular</div><h4 style="margin-top:4pt">"Cheapest decent option to Goa, now."</h4><p>29, Bengaluru. Compares across apps and tabs. Abandons when filters reset. Values speed and seeing all modes at once.</p></div>
+    <div class="box"><div class="eyebrow">The anxious payer</div><h4 style="margin-top:4pt">"My money went. Where is my ticket?"</h4><p>Any segment, right after paying. Raises a ticket, waits, may post publicly. Highest churn risk in the journey.</p></div>
   </div>
 
-  <h3>Strategic fit for Paytm</h3>
-  <ul>
-    <li><b>Payments → Travel cross-sell:</b> a lower-friction travel entry point for users who come to Paytm for UPI <span class="tag t-hyp">Hypothesis</span></li>
-    <li><b>Reach beyond metros:</b> a voice and Hindi entry point aligns with growing digital payments adoption in smaller towns <span class="tag t-hyp">Hypothesis</span></li>
-    <li><b>Reusable capability:</b> the same harness (intent, slot filling, grounded answers, payment-safe guardrails) transfers to bill payments, recharges and insurance support</li>
-  </ul>
-</section>
+  <h3>Insights that shape the product</h3>
+  <div class="insight"><div class="i">1</div><div><b>People already describe trips in one sentence.</b> Origin, destination, date, headcount and mode arrive together, in mixed language. <i>So what:</i> extract every slot from one utterance, and never re-ask what was said.</div></div>
+  <div class="insight"><div class="i">2</div><div><b>Fear of a wrong booking outweighs price sensitivity for first-time bookers.</b> <span class="pill p-a">Assumption</span> <i>So what:</i> a mandatory read-back with explicit "yes" is a conversion feature, not friction.</div></div>
+  <div class="insight"><div class="i">3</div><div><b>Price-sensitive users rarely see the cheaper mode.</b> <span class="pill p-a">Assumption</span> <i>So what:</i> every result set names both the fastest and the cheapest option across train, bus and flight.</div></div>
+  <div class="insight"><div class="i">4</div><div><b>After payment, silence is the enemy.</b> A clear "no money was taken" or "your refund has started" prevents most follow-up contacts. <i>So what:</i> payment failures are handled in-conversation, with a specific next step.</div></div>
+  <div class="insight"><div class="i">5</div><div><b>Trust is earned by what the assistant refuses to do.</b> Never asking for an OTP, never booking without consent, never guessing a fare. <i>So what:</i> the guardrails are visible in the experience, not hidden in the backend.</div></div>
 
-<!-- ============================ 2 PRODUCT SENSE ============================ -->
-<section>
-  <h2><span class="num">2</span>Product sense: users, problems, prioritisation</h2>
-  <p class="lede">Start from the customer, not the model. Who struggles, where, and which problem is worth solving first?</p>
+  <div class="note"><b>Research plan to validate:</b> 15 interviews in Hindi with Tier-2/3 train bookers (including people who book for others), a review of 200 support transcripts tagged "payment", and search-log mining for colloquial city names and code-switching.</div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>5</span></div>
+</div>
 
-  <h3>Segments and jobs to be done</h3>
-  <table>
-    <tr><th style="width:21%">Segment</th><th style="width:27%">Job to be done</th><th>Today's behaviour and pain</th><th style="width:20%">What would win them</th></tr>
-    <tr><td><b>Family booker, Tier-2/3</b><br><span class="small">e.g. 45, Wardha, Hindi-first, books trains 4–5× a year</span></td><td>"Book the right train for my family without asking my son."</td><td>Asks someone else or goes to an agent. Unsure of station codes and class names. Fears booking the wrong date.</td><td>Speaks Hindi, gets a read-back, clear refund rules</td></tr>
-    <tr><td><b>Busy repeat traveller, metro</b><br><span class="small">e.g. 29, Bengaluru</span></td><td>"Cheapest decent option to Goa, now."</td><td>Compares across tabs and apps. Abandons when filters reset.</td><td>One sentence → fastest and cheapest named</td></tr>
-    <tr><td><b>Anxious post-payment user</b><br><span class="small">any segment</span></td><td>"My money went. Where is my ticket?"</td><td>Raises a ticket, waits, may post on social media. High churn risk.</td><td>An instant, honest answer with a next step</td></tr>
-  </table>
+<!-- ================================ 05 STRATEGY ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">05</span><h2>Strategy and prioritisation</h2><span class="kick">Where to play, how to win</span></div>
+  <p class="thesis">Paytm's edge isn't inventory. The customer is already inside a UPI app, so payment is one tap rather than a hand-off. The strategy is to win the customers others under-serve, at the step where others fail.</p>
 
-  <h3>Journey friction map</h3>
-  <table>
-    <tr><th style="width:15%">Stage</th><th>Friction</th><th style="width:13%">Severity</th><th style="width:33%">How I would confirm it</th></tr>
-    <tr><td>Search</td><td>Spellings ("Jodpur"), station vs city, zero-result searches</td><td><span class="tag t-high">High</span></td><td>Zero-result search rate by app language and city tier</td></tr>
-    <tr><td>Compare</td><td>Flight, train and bus in separate tabs. The cheaper mode is never seen</td><td><span class="tag t-hyp">Medium</span></td><td>Cross-mode views per session. Mode switches before booking</td></tr>
-    <tr><td>Decide</td><td>Fare rules and refund terms in small print. The fare moves while the user hesitates</td><td><span class="tag t-hyp">Medium</span></td><td>Time on review page. Fare-change errors at payment</td></tr>
-    <tr><td>Pay</td><td>App hand-off, bank timeouts, declined requests</td><td><span class="tag t-high">High</span></td><td>Payment failure reasons. Retry rate. Abandon after failure</td></tr>
-    <tr><td>After</td><td>Debited but no ticket. Opaque cancellation maths</td><td><span class="tag t-high">High</span></td><td>Top-20 support intents. Time to resolution</td></tr>
-  </table>
-
-  <h3>Prioritisation: what to build first</h3>
-  <p>RICE scores are illustrative: reach and effort are relative estimates I would replace with Paytm data. The point is the reasoning, not the decimals.</p>
-  <table>
-    <tr><th style="width:30%">Option</th><th>Reach</th><th>Impact</th><th>Confidence</th><th>Effort</th><th>RICE</th><th style="width:28%">Read</th></tr>
-    <tr><td><b>Post-booking voice support</b> (status, cancel, money deducted)</td><td>8</td><td>2</td><td>80%</td><td>2</td><td><b>6.4</b></td><td>Lowest risk, measurable ticket deflection. <b>Ship first.</b></td></tr>
-    <tr><td><b>Voice booking, trains</b></td><td>7</td><td>3</td><td>50%</td><td>4</td><td><b>2.6</b></td><td>Biggest upside, highest uncertainty. <b>Pilot at 1%.</b></td></tr>
-    <tr><td>Smarter typed search (spelling, Hinglish autocomplete)</td><td>9</td><td>1</td><td>70%</td><td>3</td><td>2.1</td><td>Good hygiene and a likely by-product of the NLU work</td></tr>
-    <tr><td>Fully Hindi UI</td><td>6</td><td>1</td><td>60%</td><td>3</td><td>1.2</td><td>Necessary, not sufficient: forms are still forms</td></tr>
-    <tr><td>Voice booking, flights</td><td>4</td><td>2</td><td>40%</td><td>4</td><td>0.8</td><td>Later: higher-income segment, less form friction</td></tr>
-  </table>
-  <div class="callout"><b>Decision:</b> sequence for risk, not just upside. Post-booking support builds the harness, the eval set and customer trust at low risk. Train voice booking runs as a parallel 1% experiment on the same stack.</div>
-</section>
-
-<!-- ============================ 3 SOLUTION ============================ -->
-<section>
-  <h2><span class="num">3</span>Solution and MVP scope</h2>
-  <p class="lede">A conversation that asks only for what is missing, never books without a "yes", and keeps the PIN on the UPI screen.</p>
-
-  <h3>Product principles</h3>
-  <div class="grid3">
-    <div class="card"><h4>1. Ask only what's missing</h4><p>One sentence can fill every field. Never re-ask something the user already said.</p></div>
-    <div class="card"><h4>2. Approval before action</h4><p>Read back operator, time, total and refund rule, then wait for an explicit "yes".</p></div>
-    <div class="card"><h4>3. The model never states money</h4><p>Prices, PNRs and refunds come from systems of record, never from generated text.</p></div>
-    <div class="card"><h4>4. Secrets never enter the chat</h4><p>PIN, OTP and card numbers are blocked before they're logged or sent to a model.</p></div>
-    <div class="card"><h4>5. Every failure has a next step</h4><p>Failed payment → retry the same order. Debited → reconcile now. Cancel → quote first.</p></div>
-    <div class="card"><h4>6. Fall back, don't fall over</h4><p>If the LLM is slow or down, a deterministic engine continues the same conversation.</p></div>
-  </div>
-
-  <h3>The core experience</h3>
-  <table>
-    <tr><th style="width:20%">Customer says</th><th>Agent does</th><th style="width:30%">Why it matters</th></tr>
-    <tr><td>"Mumbai se Nagpur agle Friday, 2 log, train"</td><td>Extracts all five details in one turn and searches immediately</td><td>Zero follow-up questions for a complete sentence</td></tr>
-    <tr><td>"Jaipur jaana hai kal"</td><td>"Got it, Jaipur, Fri 13 Nov. Where are you travelling from?"</td><td>Confirms what it heard, asks for one thing</td></tr>
-    <tr><td>"Sabse sasta?"</td><td>Re-ranks across modes and proposes the cheapest, with refund rule</td><td>Price-sensitive users see the bus or sleeper option</td></tr>
-    <tr><td>"Haan, kar do"</td><td>Locks the fare for 10 minutes, opens in-app UPI</td><td>Explicit consent. Fare can't move while paying</td></tr>
-    <tr><td>"Paise kat gaye, ticket nahi aaya"</td><td>Checks bank, ledger and inventory, then issues the ticket or starts a full refund</td><td>A ticket becomes a 1-second answer</td></tr>
-  </table>
-
-  <h3>MVP scope</h3>
-  <div class="grid2">
-    <div class="card"><h4>In scope</h4><p>Trains (Sleeper, 3AC, 2AC) · Hindi, Hinglish, Indian English · one-way · up to 6 travellers · in-app UPI · status, cancellation and refund quote · money-deducted reconciliation · Insights instrumentation</p></div>
-    <div class="card"><h4>Out of scope (deliberately)</h4><p>Tatkal (timing-critical, high-stakes) · seat and berth choice by voice · multi-city · wallet and EMI payment options · regional languages beyond Hindi (phase 3) · IRCTC account creation by voice</p></div>
-  </div>
-</section>
-
-<!-- ============================ 4 AI DESIGN ============================ -->
-<section class="dense">
-  <h2><span class="num">4</span>AI system design: context engineering and the harness</h2>
-  <p class="lede">The model is the easy part. What the model sees, what it may decide, and what is checked before a customer hears it: that is the product.</p>
-
-  <div class="callout"><b>Design principle: the LLM understands, tools decide, templates speak.</b> Gemini turns speech into structured intent. Fares, PNRs and refunds come only from tools, and replies are templates filled from tool output, then verified. "Never invent a fare" is enforced and tested, not just prompted.</div>
-
-  <h3>The harness, layer by layer</h3>
-  <table>
-    <tr><th style="width:23%">Layer</th><th>What it guarantees</th><th style="width:30%">Product reason</th></tr>
-    <tr><td>Credential guard</td><td>PIN, OTP and card numbers blocked before storage, logging or model calls. At the payment step even a bare 4–6 digit number is treated as a PIN</td><td>"Tell me the OTP" is the #1 voice-fraud script</td></tr>
-    <tr><td>PII redaction</td><td>Phone and account numbers masked before text leaves the device</td><td>Data minimisation (DPDP Act 2023)</td></tr>
-    <tr><td>Layered context</td><td>Policy → slot state → options on screen → last 6 turns, in priority order</td><td>Resolves "the second one" or a bare "2" correctly</td></tr>
-    <tr><td>Token budget</td><td>≤1,200 tokens per turn. Oldest dialogue trimmed first; policy and state never dropped</td><td>Predictable latency and cost per session</td></tr>
-    <tr><td>Structured output + server checks</td><td>JSON schema. Server rejects past dates, implausible traveller counts, injection-like text</td><td>A schema guarantees shape, not sense</td></tr>
-    <tr><td>Deterministic overrides</td><td>For "yes", "no" and payment complaints, rules beat the model</td><td>High-stakes intents shouldn't be probabilistic</td></tr>
-    <tr><td>Slot ledger with provenance</td><td>Each detail stores value, source (LLM, rules or UI) and turn</td><td>Debuggable and measurable in production</td></tr>
-    <tr><td>Grounding validator</td><td>Every ₹ amount and booking code in a reply must exist in tool output, or the reply is blocked and logged</td><td>Zero hallucinated money, by construction</td></tr>
-    <tr><td>Graceful degradation</td><td>An offline engine produces the same output shape when the LLM times out</td><td>Outages degrade quality, not availability</td></tr>
-  </table>
-
-  <div class="grid2">
+  <div class="g2">
     <div>
-      <h3>Latency budget (voice lives or dies here)</h3>
+      <h3 style="margin-top:0">Options against impact and risk</h3>
+      <div class="matrix">
+        <span class="ax" style="left:-14pt;top:0;transform:rotate(-90deg) translateX(-100%);transform-origin:left top">Customer &amp; business impact →</span>
+        <span class="ax" style="right:0;bottom:-13pt">Delivery &amp; trust risk →</span>
+        <span class="q" style="left:6pt;top:4pt">Do first</span><span class="q" style="right:6pt;top:4pt">Pilot carefully</span>
+        <span class="q" style="left:6pt;bottom:4pt">Hygiene</span><span class="q" style="right:6pt;bottom:4pt">Avoid for now</span>
+        <div class="dot pick" style="left:28%;top:26%"><i></i>Post-booking voice support</div>
+        <div class="dot pick" style="left:70%;top:18%"><i></i>Voice booking: trains</div>
+        <div class="dot" style="left:24%;top:62%"><i></i>Hinglish typed search</div>
+        <div class="dot" style="left:40%;top:78%"><i></i>Full Hindi UI</div>
+        <div class="dot" style="left:78%;top:62%"><i></i>Voice booking: flights</div>
+        <div class="dot" style="left:86%;top:86%"><i></i>Tatkal by voice</div>
+      </div>
+    </div>
+    <div>
+      <h3 style="margin-top:0">RICE, relative and illustrative</h3>
       <table>
-        <tr><th>Stage</th><th>Target p90</th><th>Measured in prototype</th></tr>
-        <tr><td>Understanding (LLM)</td><td>≤ 800 ms</td><td>2.1–3.4 s <span class="small">(Gemini 2.5 Flash, n=5)</span></td></tr>
-        <tr><td>Tools (search, hold)</td><td>≤ 600 ms</td><td>~0.3–0.5 s <span class="small">(sandbox)</span></td></tr>
-        <tr><td>Speech out, first audio</td><td>≤ 500 ms</td><td>~4 s <span class="small">(non-streaming TTS)</span></td></tr>
-        <tr><td>Full turn</td><td>≤ 2.5 s</td><td>Above target</td></tr>
+        <tr><th>Option</th><th>R</th><th>I</th><th>C</th><th>E</th><th>Score</th></tr>
+        <tr><td><b>Post-booking voice support</b></td><td>8</td><td>2</td><td>.8</td><td>2</td><td><b>6.4</b></td></tr>
+        <tr><td><b>Voice booking: trains</b></td><td>7</td><td>3</td><td>.5</td><td>4</td><td><b>2.6</b></td></tr>
+        <tr><td>Hinglish typed search</td><td>9</td><td>1</td><td>.7</td><td>3</td><td>2.1</td></tr>
+        <tr><td>Full Hindi UI</td><td>6</td><td>1</td><td>.6</td><td>3</td><td>1.2</td></tr>
+        <tr><td>Voice booking: flights</td><td>4</td><td>2</td><td>.4</td><td>4</td><td>0.8</td></tr>
       </table>
-      <p class="small" style="margin:0">Finding: TTS and LLM round-trips dominate, not travel APIs. Fix: streaming TTS, a faster NLU model, cached prompt prefix.</p>
+      <p class="small">Scores rank options, not forecast outcomes. Reach and effort get replaced with real data before planning.</p>
+    </div>
+  </div>
+
+  <h3>Why this sequence</h3>
+  <div class="g3">
+    <div class="box"><h4>Risk before reach</h4><p>Support conversations reuse 80% of the stack: NLU, harness, payments, evals. They can't book anything wrong.</p></div>
+    <div class="box"><h4>Learn on real language</h4><p>Support traffic produces the golden set of real Hindi and Hinglish utterances that booking needs.</p></div>
+    <div class="box"><h4>Earn trust, then ask for more</h4><p>Customers who saw the agent fix a payment issue are the most likely early adopters of voice booking.</p></div>
+  </div>
+
+  <h3>Deliberately not doing</h3>
+  <ul>
+    <li><b>Tatkal by voice:</b> timing-critical and high-anxiety; failure is expensive. Earn trust first.</li>
+    <li><b>Autonomous "book it for me":</b> no booking without explicit, per-transaction consent.</li>
+    <li><b>A general travel chatbot:</b> open-ended chat adds cost and risk without a conversion story.</li>
+  </ul>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>6</span></div>
+</div>
+
+<!-- ================================ 06 PRODUCT ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">06</span><h2>The product</h2><span class="kick">Principles, experience, scope</span></div>
+
+  <div class="g3">
+    <div class="box"><h4>Ask only what's missing</h4><p>One sentence can fill every field. Confirm what was heard, ask for one thing.</p></div>
+    <div class="box"><h4>Approval before action</h4><p>Read back train, time, total and refund rule, then wait for "yes".</p></div>
+    <div class="box"><h4>The model never states money</h4><p>Fares, PNRs and refunds come only from systems of record.</p></div>
+    <div class="box"><h4>Secrets never enter the chat</h4><p>PIN, OTP and card numbers are blocked before they're logged or modelled.</p></div>
+    <div class="box"><h4>Every failure has a next step</h4><p>Failed → retry same order. Debited → reconcile. Cancel → quote first.</p></div>
+    <div class="box"><h4>Fall back, don't fall over</h4><p>If the model is slow, a deterministic engine continues the same conversation.</p></div>
+  </div>
+
+  <h3>The experience, turn by turn</h3>
+  <div class="story">
+    <div class="turn"><div class="u">"Mumbai se Nagpur agle Friday, do log, train"</div><div>All five details extracted in one turn. Agent: <i>"I found 3 options for Fri 20 Nov for 2 travellers. Fastest is the Duronto at 11h 45m for ₹3,700; cheapest is Sleeper for ₹840. Which one should I book?"</i></div></div>
+    <div class="turn"><div class="u">"Sabse sasta wala"</div><div>Proposes the cheapest, with departure, duration, total and cancellation rule, and asks <i>"Shall I book it?"</i></div></div>
+    <div class="turn"><div class="u">"Haan, kar do"</div><div>Asks for the lead passenger's name, locks the fare for 10 minutes and opens Paytm UPI. The PIN is entered on the UPI screen only.</div></div>
+    <div class="turn"><div class="u">"Paise kat gaye, ticket nahi aaya"</div><div>Checks bank, ledger and railway inventory, then issues the ticket or starts a full refund, and says which and why.</div></div>
+    <div class="turn"><div class="u">"Cancel karna hai, kitna wapas milega?"</div><div>Quotes the refund (paid − fee per traveller − convenience fee) and cancels only after confirmation.</div></div>
+  </div>
+
+  <h3>Scope</h3>
+  <table>
+    <tr><th style="width:14%">Horizon</th><th>Included</th></tr>
+    <tr><td><b>Now</b></td><td>Post-booking voice support · voice booking for trains (SL / 3AC / 2AC, one-way, ≤ 6 travellers) · Hindi, Hinglish, Indian English · in-app UPI · journey instrumentation</td></tr>
+    <tr><td><b>Next</b></td><td>Buses · return journeys · streaming speech in and out · saved co-travellers</td></tr>
+    <tr><td><b>Later</b></td><td>Flights and hotels · Marathi, Tamil, Bengali · berth preference by voice · Tatkal (only after trust metrics hold)</td></tr>
+  </table>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>7</span></div>
+</div>
+
+<!-- ================================ 07 SYSTEM ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">07</span><h2>Context engineering &amp; the harness</h2><span class="kick">The harness</span></div>
+  <p class="thesis">The model understands, tools decide, templates speak. "Never invent a fare" is enforced in code and tests, not requested in a prompt.</p>
+
+  <div class="arch">
+    <div class="st guard"><b>Inbound guard</b>Blocks PIN, OTP, card. Redacts phone and account numbers</div>
+    <div class="st"><b>Context assembly</b>Policy → slot state → options on screen → last 6 turns; ≤1,200 tokens</div>
+    <div class="st llm"><b>LLM: understand</b>JSON-schema intent and slots; server re-validates</div>
+    <div class="st"><b>Tools: decide</b>Search, hold, UPI, reconcile, refund. Systems of record</div>
+    <div class="st guard"><b>Outbound guard</b>Every ₹ and booking code must exist in tool output</div>
+  </div>
+  <p class="cap">Figure. One conversational turn. Red stages are hard guarantees; the blue stage is the only probabilistic one.</p>
+
+  <h3>Harness components and the risk each one retires</h3>
+  <table>
+    <tr><th style="width:24%">Component</th><th>Behaviour</th><th style="width:28%">Risk retired</th></tr>
+    <tr><td><b>Credential guard</b></td><td>Blocks secrets before storage or model calls; at payment, a bare 4–6 digit number is treated as a PIN</td><td>Social-engineering and OTP scams</td></tr>
+    <tr><td><b>PII redaction</b></td><td>Masks phone and account numbers before text leaves the device</td><td>Data minimisation (DPDP Act 2023)</td></tr>
+    <tr><td><b>Budgeted, layered context</b></td><td>Fixed priority order; oldest dialogue trimmed first; policy and state never dropped</td><td>Context rot; cost and latency drift</td></tr>
+    <tr><td><b>Structured output + validation</b></td><td>Schema-constrained JSON; rejects past dates, implausible headcounts, injection-like text</td><td>Malformed or adversarial output</td></tr>
+    <tr><td><b>Deterministic overrides</b></td><td>For "yes", "no" and payment complaints, rules beat the model</td><td>Probabilistic consent</td></tr>
+    <tr><td><b>Slot ledger with provenance</b></td><td>Each detail records value, source and turn</td><td>Undebuggable agent behaviour</td></tr>
+    <tr><td><b>Grounding validator</b></td><td>Unverified amounts or codes are blocked and logged</td><td>Hallucinated fares and PNRs</td></tr>
+    <tr><td><b>Graceful degradation</b></td><td>Same output contract from a rules engine on timeout</td><td>Vendor outage = product outage</td></tr>
+  </table>
+
+  <div class="g2">
+    <div>
+      <h3>Latency budget</h3>
+      <table>
+        <tr><th>Stage</th><th>Target p90</th><th>Prototype</th></tr>
+        <tr><td>Understand (LLM)</td><td>≤ 800 ms</td><td>2.1–3.4 s</td></tr>
+        <tr><td>Tools</td><td>≤ 600 ms</td><td>0.3–0.5 s</td></tr>
+        <tr><td>First audio out</td><td>≤ 500 ms</td><td>~4 s</td></tr>
+      </table>
+      <p class="small">Measured on the prototype (small sample). Speech and model round-trips dominate, not travel APIs. Levers: streaming TTS, a faster NLU model, cached prompt prefix.</p>
     </div>
     <div>
       <h3>Build vs buy</h3>
       <table>
-        <tr><th>Component</th><th>Choice</th><th>Why</th></tr>
-        <tr><td>NLU</td><td>Buy (Gemini Flash-class)</td><td>Commodity capability. Keep it swappable behind one interface</td></tr>
-        <tr><td>Indic TTS / STT</td><td>Buy (Sarvam-class)</td><td>Indic voice quality is a specialist problem</td></tr>
-        <tr><td>Harness, guards, evals</td><td><b>Build</b></td><td>This is the moat: domain policy, trust and metrics</td></tr>
-        <tr><td>Payments and reconciliation</td><td><b>Build</b> (own rails)</td><td>Paytm's core competence</td></tr>
+        <tr><th>Layer</th><th>Call</th></tr>
+        <tr><td>Language model</td><td>Buy; swappable behind one interface</td></tr>
+        <tr><td>Indic speech</td><td>Buy; specialist quality problem</td></tr>
+        <tr><td><b>Harness, guardrails, evals</b></td><td><b>Build: this is the moat</b></td></tr>
+        <tr><td><b>Payments, reconciliation</b></td><td><b>Build: core competence</b></td></tr>
       </table>
-
     </div>
   </div>
-</section>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>8</span></div>
+</div>
 
-<!-- ============================ 5 FINTECH ============================ -->
-<section>
-  <h2><span class="num">5</span>The fintech layer: payments, failures, refunds, compliance</h2>
-  <p class="lede">In travel, the conversion problem and the trust problem meet at the payment step. Most of the product's risk lives here.</p>
+<!-- ================================ 08 PAYMENTS ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">08</span><h2>Payments, failures, refunds</h2><span class="kick">Trust layer</span></div>
+  <p class="thesis">Most of the product's risk, and much of its upside, sits in the ninety seconds after the customer says "yes".</p>
 
-  <h3>Payment failure taxonomy and agent behaviour</h3>
-  <table>
-    <tr><th style="width:24%">Pattern</th><th>Agent response</th><th style="width:27%">Principle</th></tr>
-    <tr><td>Declined in UPI app</td><td>"No money was taken. Your fare is held for N more minutes. Shall I send it again?"</td><td>Reassure first, preserve the hold</td></tr>
-    <tr><td>Bank timeout</td><td>Same as above, with "your bank did not respond in time"</td><td>Name the cause in plain words</td></tr>
-    <tr><td>Insufficient balance</td><td>Same, with the reason. No blame language</td><td>Dignity in failure copy</td></tr>
-    <tr><td>Retry</td><td>Re-issues the request on the <b>same order id</b></td><td>Idempotency: no double charge</td></tr>
-    <tr><td>Debited, callback lost, seat available</td><td>3-way check (bank, ledger, inventory) → ticket issued</td><td>Resolve now, not in 48 hours</td></tr>
-    <tr><td>Debited, hold expired, seat sold</td><td>3-way check → full auto-refund, no fees, offer an alternative</td><td>Own the failure. Don't make the user chase it</td></tr>
-    <tr><td>No debit found</td><td>"Nothing is stuck. A pending debit usually reverses on its own."</td><td>Prevent unnecessary tickets</td></tr>
-  </table>
-
-  <h3>Cancellation: quote before confirm</h3>
-  <p>Refund = amount paid − cancellation fee (per traveller; more than 24h vs within 24h of departure) − non-refundable convenience fee. The agent states the refund amount <i>before</i> asking for confirmation. Surprise refunds are a top driver of complaints and chargebacks <span class="tag t-hyp">Hypothesis</span>.</p>
-
-  <h3>Compliance and trust considerations</h3>
-  <table>
-    <tr><th style="width:24%">Area</th><th>How the design responds</th><th style="width:30%">Open item for legal / risk</th></tr>
-    <tr><td>UPI authentication (NPCI)</td><td>PIN entered only on the UPI screen. The agent never asks for or accepts it</td><td>Confirm in-app intent flow and consent copy</td></tr>
-    <tr><td>Failed-transaction handling (RBI)</td><td>Reconciliation and auto-refund paths built in, with audit trail</td><td>Align refund timelines and customer messaging with RBI's TAT norms</td></tr>
-    <tr><td>Personal data (DPDP Act 2023)</td><td>Redaction before the LLM. No audio stored. Keys server-side</td><td>Consent notice, retention, provider data residency</td></tr>
-    <tr><td>Model risk</td><td>No generated money values. Deterministic overrides. Audit logs per turn</td><td>Model change management and approval process</td></tr>
-  </table>
-</section>
-
-<!-- ============================ 6 METRICS ============================ -->
-<section>
-  <h2><span class="num">6</span>Metrics and KPI tree</h2>
-  <p class="lede">One North Star, a few inputs the team can move weekly, and guardrails that stop us winning the wrong way.</p>
-
-  <div class="fig">
-    <div class="tree">
-      <div class="col"><div class="node ns">North Star<br><span style="font-weight:400">Confirmed bookings per 100 voice sessions started</span></div></div>
-      <div class="col">
-        <div class="node"><b>Understanding</b><br>Turns to options · slots captured per turn</div>
-        <div class="node"><b>Decision</b><br>Option-selected rate · approval rate after read-back</div>
-        <div class="node"><b>Payment</b><br>First-attempt payment success · retry recovery rate</div>
-      </div>
-      <div class="col">
-        <div class="node">NLU slot accuracy (golden set) ≥ 95%</div>
-        <div class="node">Turn latency p90 ≤ 2.5 s</div>
-        <div class="node g"><b>Guardrail</b> · wrong-booking rate ≤ form baseline</div>
-        <div class="node g"><b>Guardrail</b> · payment tickets per 1k bookings ≤ baseline</div>
-        <div class="node g"><b>Guardrail</b> · PIN/OTP reaching LLM or logs = 0</div>
-      </div>
+  <h3 style="margin-top:0">Resolution logic for "money deducted, ticket pending"</h3>
+  <div class="dtree box">
+    <div class="lvl" style="grid-template-columns:1fr"><div class="q">Customer reports a debit without a ticket</div></div>
+    <div class="lvl" style="grid-template-columns:1fr 1fr"><div class="a">Bank / PSP: <b>not debited</b></div><div class="a">Bank / PSP: <b>debited</b>. Check booking ledger and inventory</div></div>
+    <div class="lvl" style="grid-template-columns:1fr 1fr 1fr">
+      <div class="a ok"><b>Reassure.</b> "Nothing is stuck; a pending debit reverses on its own." Offer retry.</div>
+      <div class="a ok"><b>Seat still held or available</b> → issue ticket now, against the existing payment.</div>
+      <div class="a bad"><b>Hold expired and seat sold</b> → full auto-refund, no fees; offer an alternative.</div>
     </div>
   </div>
-  <p class="figcap">Figure 1. KPI tree. Left to right: outcome → levers the team owns → quality bars and guardrails.</p>
 
-  <h3>Metric definitions</h3>
+  <h3>Payment failure patterns</h3>
   <table>
-    <tr><th style="width:24%">Metric</th><th>Definition</th><th style="width:14%">Type</th><th style="width:16%">Pilot target</th></tr>
-    <tr><td>Voice booking conversion</td><td>Sessions with a confirmed ticket ÷ sessions with ≥1 user turn</td><td>North Star</td><td>≥ form baseline</td></tr>
-    <tr><td>Turns to options</td><td>User turns before options are shown (median)</td><td>Input</td><td>≤ 2</td></tr>
-    <tr><td>Slots per turn</td><td>Trip details captured ÷ user turns in discovery</td><td>Input</td><td>≥ 2</td></tr>
-    <tr><td>First-attempt payment success</td><td>Payments captured on first request ÷ payments requested</td><td>Input</td><td>≥ form baseline</td></tr>
-    <tr><td>Retry recovery</td><td>Bookings completed after a failed payment ÷ failed payments</td><td>Input</td><td>Track, then set</td></tr>
-    <tr><td>Wrong-booking rate</td><td>Cancellations within 1h tagged "wrong date/train" ÷ bookings</td><td>Guardrail</td><td>≤ form baseline</td></tr>
-    <tr><td>Ungrounded-claim blocks</td><td>Replies blocked by the grounding validator per 1k turns</td><td>AI quality</td><td>Trending to 0</td></tr>
-    <tr><td>LLM fallback share</td><td>Turns handled by the offline engine ÷ all turns</td><td>AI health</td><td>≤ 5%</td></tr>
-  </table>
-  <p class="small">All of these are already instrumented in the prototype's event stream and shown live in its Insights panel. Targets are starting points to calibrate against week-one baselines.</p>
-</section>
-
-<!-- ============================ 7 EXPERIMENT ============================ -->
-<section>
-  <h2><span class="num">7</span>Experiment design and rollout</h2>
-  <p class="lede">Prove the conversion lift on a small, low-risk slice, with explicit kill criteria written before launch.</p>
-
-  <h3>Pilot design</h3>
-  <table>
-    <tr><th style="width:24%">Element</th><th>Decision</th></tr>
-    <tr><td>Hypothesis</td><td>For Hindi-first train bookers on Android, a voice entry point increases search-to-booking conversion without increasing wrong bookings or payment tickets.</td></tr>
-    <tr><td>Population</td><td>Trains, Hindi-belt states, Android, Travel home page. 1% exposure</td></tr>
-    <tr><td>Randomisation</td><td>User-level (not session-level), so one person never sees both experiences</td></tr>
-    <tr><td>Primary metric</td><td>Search-to-booking conversion (voice entry vs form)</td></tr>
-    <tr><td>Secondary</td><td>Time to booking · payment success · support contacts per booking</td></tr>
-    <tr><td>Duration</td><td>Minimum 2 full weeks to cover weekday and weekend travel patterns</td></tr>
+    <tr><th style="width:24%">Pattern</th><th>Agent behaviour</th><th style="width:26%">Principle</th></tr>
+    <tr><td><b>Declined in UPI</b></td><td>"No money was taken. Your fare is held for N more minutes. Shall I send it again?"</td><td>Reassure first; keep the hold</td></tr>
+    <tr><td><b>Bank timeout</b></td><td>Same, naming the cause plainly</td><td>Explain, don't blame</td></tr>
+    <tr><td><b>Insufficient balance</b></td><td>Same, without judgement in the copy</td><td>Dignity in failure</td></tr>
+    <tr><td><b>Retry</b></td><td>New request on the <b>same order id</b></td><td>Idempotent: no double charge</td></tr>
+    <tr><td><b>Cancellation</b></td><td>Quote = paid − fee per traveller (more than 24h vs within 24h of departure) − convenience fee; then confirm</td><td>No surprise refunds</td></tr>
   </table>
 
-  <div class="callout"><b>Sample size (illustrative):</b> with an assumed 20% baseline conversion and a 10% relative minimum detectable effect (20% → 22%), α = 0.05 and 80% power, a two-proportion test needs roughly <b>6,500 sessions per arm</b>. I would recompute this with the real baseline before committing to the exposure level and duration.</div>
+  <h3>Compliance and trust</h3>
+  <div class="g2">
+    <div class="box"><h4>UPI authentication</h4><p>PIN entered only on the UPI screen; the assistant never asks for or accepts it. Confirm the in-app intent flow and consent copy with payments.</p></div>
+    <div class="box"><h4>Failed transactions</h4><p>Reconciliation and auto-refund paths with an audit trail. Align timelines and messaging with RBI turnaround norms.</p></div>
+    <div class="box"><h4>Personal data</h4><p>Redaction before the model, no audio stored, keys server-side. Open: consent notice, retention, provider data residency.</p></div>
+    <div class="box"><h4>Model risk</h4><p>No generated money values, deterministic consent, per-turn audit logs. Open: model change-management process.</p></div>
+  </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>9</span></div>
+</div>
 
-  <h3>Rollout plan and gates</h3>
+<!-- ================================ 09 MEASUREMENT ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">09</span><h2>Measurement and experiment</h2><span class="kick">How we will know</span></div>
+
+  <div class="tree box">
+    <div class="col"><div class="node ns"><b>North Star</b><br>Confirmed bookings per 100 voice sessions started</div></div>
+    <div class="col">
+      <div class="node"><b>Understand</b><br>Turns to options · slots per turn</div>
+      <div class="node"><b>Decide</b><br>Option-selected · approval after read-back</div>
+      <div class="node"><b>Pay</b><br>First-attempt success · retry recovery</div>
+    </div>
+    <div class="col">
+      <div class="node">Slot accuracy on golden set ≥ 95%</div>
+      <div class="node">Turn latency p90 ≤ 2.5 s · fallback share ≤ 5%</div>
+      <div class="node gr"><b>Guardrail</b> · wrong-booking rate ≤ form baseline</div>
+      <div class="node gr"><b>Guardrail</b> · payment contacts per 1k bookings ≤ baseline</div>
+      <div class="node gr"><b>Guardrail</b> · credentials reaching logs or a model = 0</div>
+    </div>
+  </div>
+  <p class="cap">KPI tree: outcome → levers the team moves weekly → quality bars and guardrails.</p>
+
+  <h3>Experiment design</h3>
   <table>
-    <tr><th style="width:9%">Phase</th><th style="width:36%">Scope</th><th>Gate to move on</th></tr>
-    <tr><td>0</td><td>Internal dogfood. Golden set from 500 real utterances</td><td>Slot accuracy ≥ 95%. Zero credential leaks in red-team tests</td></tr>
-    <tr><td>1</td><td>Post-booking voice support for all train bookings</td><td>Ticket deflection measurable. CSAT not worse</td></tr>
-    <tr><td>2</td><td>Voice booking, trains, 1% (this pilot)</td><td>Primary metric not worse. All guardrails hold</td></tr>
-    <tr><td>3</td><td>10%, add buses</td><td>Conversion ≥ control, statistically significant</td></tr>
-    <tr><td>4</td><td>Flights, hotels, more languages (Marathi, Tamil, Bengali)</td><td>Per-language accuracy bar met</td></tr>
+    <tr><th style="width:22%">Element</th><th>Design</th></tr>
+    <tr><td><b>Hypothesis</b></td><td>For Hindi-first train bookers on Android, a voice entry point increases search-to-booking conversion without increasing wrong bookings or payment contacts.</td></tr>
+    <tr><td><b>Unit and split</b></td><td>User-level randomisation; 1% treatment on Travel home in Hindi-belt states</td></tr>
+    <tr><td><b>Primary metric</b></td><td>Search-to-booking conversion. Secondary: time to booking, first-attempt payment success</td></tr>
+    <tr><td><b>Power</b></td><td>At an assumed 20% baseline and 10% relative MDE (α 0.05, power 0.8), about 6,500 sessions per arm. Recomputed on the real baseline</td></tr>
+    <tr><td><b>Duration</b></td><td>At least two full weeks, to cover weekday and weekend travel intent</td></tr>
+    <tr><td><b>Ship rule</b></td><td>Primary not worse <i>and</i> every guardrail within bounds; scale to 10% and add buses</td></tr>
   </table>
 
-  <h3>Kill criteria (agreed before launch)</h3>
-  <ul>
-    <li>Wrong-booking rate more than 20% above the form baseline for 3 consecutive days</li>
-    <li>Any confirmed case of a payment credential reaching logs or a model</li>
-    <li>Turn latency p90 above 4 s for more than 24 hours</li>
-  </ul>
-</section>
+  <h3>Model quality is measured separately from product impact</h3>
+  <div class="g3">
+    <div class="box"><h4>Offline eval</h4><p>A golden set of real utterances scored for intent and slot accuracy on every change, for both the model and the fallback.</p></div>
+    <div class="box"><h4>Online health</h4><p>Fallback share, latency p50/p90 per stage, ungrounded-claim blocks per 1k turns.</p></div>
+    <div class="box"><h4>Human review</h4><p>Weekly review of sampled conversations with support and risk, feeding failures back into the golden set.</p></div>
+  </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>10</span></div>
+</div>
 
-<!-- ============================ 8 RISKS ============================ -->
-<section>
-  <h2><span class="num">8</span>Risks, trade-offs and what I would not build</h2>
-  <p class="lede">Being explicit about what can go wrong, and what we are choosing not to do.</p>
+<!-- ================================ 10 PRE-MORTEM ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">10</span><h2>Pre-mortem and risks</h2><span class="kick">Assume it failed. Why?</span></div>
+  <p class="thesis">It is three months after launch and the pilot was rolled back. The most likely reasons, and what is already in place to prevent each:</p>
 
   <table>
-    <tr><th style="width:22%">Risk</th><th style="width:11%">Severity</th><th>Mitigation</th><th style="width:24%">Still open</th></tr>
-    <tr><td>Wrong booking from a misheard date or city</td><td><span class="tag t-high">High</span></td><td>Read-back with explicit approval. Slot ledger shows exactly what was understood</td><td>Speech-recognition error rate on accents and noisy stations</td></tr>
-    <tr><td>LLM states a wrong fare or PNR</td><td><span class="tag t-high">High</span></td><td>Tools decide, templates speak, grounding validator blocks unverified numbers</td><td>Extend checks to free-text small talk in more languages</td></tr>
-    <tr><td>Social engineering / PIN sharing</td><td><span class="tag t-high">High</span></td><td>Credential guard before logs and LLM. PIN only on the UPI screen</td><td>Detect "fake agent" scams in support flows</td></tr>
-    <tr><td>Latency makes voice feel broken</td><td><span class="tag t-hyp">Medium</span></td><td>Timeouts with instant fallback. p50 and p90 tracked per stage</td><td>Streaming STT and TTS</td></tr>
-    <tr><td>LLM cost at scale</td><td><span class="tag t-hyp">Medium</span></td><td>1,200-token budget. Small JSON output. No "thinking" for NLU</td><td>Cost per confirmed booking. Prompt caching</td></tr>
-    <tr><td>Vendor dependency</td><td><span class="tag t-hyp">Medium</span></td><td>One interface for NLU. Offline engine as a floor</td><td>Second-provider evaluation</td></tr>
+    <tr><th style="width:27%">Failure story</th><th style="width:9%">Severity</th><th>Prevention in the design</th><th style="width:22%">Early warning signal</th></tr>
+    <tr><td><b>"It booked the wrong date"</b> after misheard speech</td><td><span class="pill p-h">High</span></td><td>Mandatory read-back and explicit approval; slot ledger shows exactly what was understood</td><td>Cancellations within 1h tagged "wrong date"</td></tr>
+    <tr><td><b>"It told me the wrong fare"</b></td><td><span class="pill p-h">High</span></td><td>Model never states money; grounding validator blocks unverified numbers</td><td>Ungrounded-claim blocks above zero</td></tr>
+    <tr><td><b>A scam used the assistant's voice</b> to collect an OTP</td><td><span class="pill p-h">High</span></td><td>Assistant never asks for credentials and says so; credential guard blocks them</td><td>Credential-guard triggers per 1k sessions</td></tr>
+    <tr><td><b>"It's too slow, I'll just type"</b></td><td><span class="pill p-m">Medium</span></td><td>Timeouts with instant fallback; latency tracked per stage</td><td>Turn p90 above 2.5 s; voice-to-form switches</td></tr>
+    <tr><td><b>Cost per booking too high</b> to scale</td><td><span class="pill p-m">Medium</span></td><td>1,200-token budget, small JSON outputs, no model "thinking" for NLU</td><td>Model cost per confirmed booking</td></tr>
+    <tr><td><b>Vendor outage</b> during peak</td><td><span class="pill p-m">Medium</span></td><td>Rules engine with the same output contract; one swappable interface</td><td>Fallback share above 5%</td></tr>
   </table>
+
+  <div class="decision">
+    <div class="eyebrow">Kill criteria, agreed before launch</div>
+    <p>Roll back if wrong-booking rate is more than 20% above the form baseline for 3 consecutive days, if any payment credential reaches logs or a model, or if turn latency p90 exceeds 4 s for more than 24 hours.</p>
+  </div>
 
   <h3>Trade-offs I am choosing</h3>
-  <div class="grid2">
-    <div class="card"><h4>Less chatty, more correct</h4><p>Templated replies feel less "magical" than free generation. For a flow that touches money, predictability beats personality. Personality can live in non-financial small talk.</p></div>
-    <div class="card"><h4>Narrow first</h4><p>Trains-only, Hindi-only, one-way first. A narrow pilot gives a clean read on the hypothesis. A broad one gives noise and more ways to fail.</p></div>
+  <div class="g2">
+    <div class="box"><h4>Correct over charming</h4><p>Templated replies feel less magical than free generation. Next to money, predictability beats personality; personality can live in small talk.</p></div>
+    <div class="box"><h4>Narrow over broad</h4><p>Trains, Hindi, one-way first. A narrow pilot gives a clean read on one hypothesis; a broad one gives noise and more ways to fail.</p></div>
   </div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>11</span></div>
+</div>
 
-  <h3>What I would not build (yet)</h3>
-  <ul>
-    <li><b>Tatkal by voice:</b> timing-critical, high-anxiety, and failures are expensive. Earn trust first</li>
-    <li><b>Fully autonomous "book it for me" agents:</b> no booking without explicit, per-transaction consent</li>
-    <li><b>A general travel chatbot:</b> open-ended chat increases cost and risk without a clear conversion story</li>
-  </ul>
-</section>
+<!-- ================================ 11 ROADMAP ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">11</span><h2>Roadmap</h2><span class="kick">Learn → build → prove → scale</span></div>
 
-<!-- ============================ 9 90 DAYS ============================ -->
-<section>
-  <h2><span class="num">9</span>First 90 days</h2>
-  <p class="lede">Learn, ship the low-risk win, then run the experiment.</p>
   <table>
-    <tr><th style="width:15%">When</th><th style="width:28%">Focus</th><th>Outputs</th></tr>
-    <tr><td>Weeks 1–3</td><td>Learn the business</td><td>Funnel baselines by city tier and app language. Top-20 Travel support intents. 15 customer interviews in Hindi with Tier-2/3 train bookers. Real golden set (500 utterances)</td></tr>
-    <tr><td>Weeks 4–6</td><td>Ship the foundation</td><td>Harness integrated with real train search and in-app UPI intent. Streaming TTS. Post-booking voice support in dogfood</td></tr>
-    <tr><td>Weeks 7–10</td><td>Run the pilot</td><td>1% voice-booking experiment live. Weekly conversation reviews with support and risk. Prompt and rule fixes from real failures</td></tr>
-    <tr><td>Weeks 11–13</td><td>Decide with data</td><td>Pilot read-out against the pre-agreed gates. Scale or stop. Spec for buses and the next language</td></tr>
+    <tr><th style="width:15%">Weeks</th><th style="width:22%">Phase</th><th>Outcomes</th><th style="width:24%">Exit gate</th></tr>
+    <tr><td>1–3</td><td><b>Learn</b></td><td>Funnel baselines by city tier and app language; top support intents; 15 Hindi interviews; golden set of 500 real utterances</td><td>Baselines agreed with analytics</td></tr>
+    <tr><td>4–6</td><td><b>Build the foundation</b></td><td>Harness on real train search and in-app UPI; streaming speech; post-booking voice support in dogfood</td><td>Slot accuracy ≥ 95%; zero credential leaks in red-team</td></tr>
+    <tr><td>7–10</td><td><b>Prove</b></td><td>Support launch to all train bookings; 1% voice-booking experiment; weekly conversation reviews</td><td>Primary metric not worse; guardrails hold</td></tr>
+    <tr><td>11–13</td><td><b>Decide and scale</b></td><td>Read-out against pre-agreed gates; 10% plus buses, or stop</td><td>Significant lift vs control</td></tr>
   </table>
 
-  <h3>How I would work with the team</h3>
-  <div class="grid3">
-    <div class="card"><h4>Engineering</h4><p>Agree the harness interfaces first (NLU, tools, validator) so model and vendor choices stay swappable.</p></div>
-    <div class="card"><h4>Risk, legal, payments</h4><p>Review credential handling, refund messaging and audit logs before any external exposure.</p></div>
-    <div class="card"><h4>Support and ops</h4><p>Weekly review of real conversations. Support agents are the best source of golden-set utterances.</p></div>
+  <h3>Operating model</h3>
+  <div class="g3">
+    <div class="box"><h4>Engineering</h4><p>Agree harness interfaces (understand, tools, validate) first, so model and vendor choices stay swappable.</p></div>
+    <div class="box"><h4>Risk, legal, payments</h4><p>Sign-off on credential handling, refund messaging and audit logs before any external exposure.</p></div>
+    <div class="box"><h4>Support and operations</h4><p>Weekly review of real conversations; agents are the best source of golden-set utterances.</p></div>
   </div>
 
-  <h3>Questions I would bring to the Paytm Travel team</h3>
+  <h3>Open questions for the Travel team</h3>
   <ul>
     <li>Which booking step loses the most Tier-2/3 and Hindi-language users today?</li>
-    <li>What share of Travel support contacts are "money deducted, ticket pending", and what is the median time to resolution?</li>
-    <li>Where exactly must the flow hand off to IRCTC (login, captcha), and how does that affect a voice journey?</li>
+    <li>What share of Travel support contacts are debit-without-ticket, and what is the median time to resolution?</li>
+    <li>Where must the flow hand off to IRCTC (login, captcha), and how does that shape a voice journey?</li>
     <li>Is post-booking voice support an acceptable first launch, given its lower risk and clearer ROI?</li>
   </ul>
-</section>
 
-<!-- ============================ 10 EVIDENCE ============================ -->
-<section class="dense">
-  <h2><span class="num">10</span>Prototype evidence</h2>
-  <p class="lede">A working build, so this document describes something that exists rather than a slide.</p>
+  <div class="note" style="margin-top:12pt"><b>Beyond Travel.</b> The same harness (intent and slot extraction, grounded answers, payment-safe guardrails, in-conversation failure recovery) transfers directly to bill payments, recharges and insurance servicing. The investment compounds across the app.</div>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>12</span></div>
+</div>
 
-  <table>
-    <tr><th style="width:42%">Component</th><th style="width:16%">Status</th><th>Notes</th></tr>
-    <tr><td>Gemini 2.5 Flash understanding (JSON schema)</td><td><span class="tag t-real">Real</span></td><td>Called server-side only. Output re-validated</td></tr>
-    <tr><td>Context harness: guards, redaction, ledger, budget, validator</td><td><span class="tag t-real">Real</span></td><td>Covered by unit and end-to-end tests</td></tr>
-    <tr><td>Offline NLU and Hinglish date parser</td><td><span class="tag t-real">Real</span></td><td>Fallback and eval baseline</td></tr>
-    <tr><td>Indic TTS (Sarvam Bulbul) via backend</td><td><span class="tag t-real">Real</span></td><td>Key never shipped to the browser</td></tr>
-    <tr><td>Journey analytics and latency</td><td><span class="tag t-real">Real</span></td><td>Computed from events; no hardcoded numbers</td></tr>
-    <tr><td>Travel inventory, fares, PNRs</td><td><span class="tag t-sim">Sandbox</span></td><td>Generated per route</td></tr>
-    <tr><td>UPI, bank callbacks, refunds</td><td><span class="tag t-sim">Sandbox</span></td><td>Decision logic is real; no money moves</td></tr>
-  </table>
+<!-- ================================ APPENDIX ================================ -->
+<div class="page">
+  <div class="sec-head"><span class="n">A</span><h2>Appendix: prototype and assumptions</h2><span class="kick">Evidence</span></div>
+  <p>A working prototype exists to test the riskiest assumptions: whether Hinglish trip requests can be understood in one turn, and whether an LLM can sit in a payment flow without ever producing a money value. Code: github.com/devanshudhoble/namanai.</p>
 
-  <div class="grid2">
+  <div class="g2">
+    <div><img class="shot" src="../../public/docs/v2_approval_readback.png" alt=""><p class="cap">"Sabse sasta wala" → cheapest option read back with fare, timing and refund rule before asking for approval.</p></div>
+    <div><img class="shot" src="../../public/docs/v2_payment_failure_lab.png" alt=""><p class="cap">Fare held for 10 minutes, in-app UPI, and every payment failure pattern reproducible for testing.</p></div>
+  </div>
+
+  <div class="g2" style="margin-top:8pt">
     <div>
-      <img class="shot" src="../../public/docs/v2_approval_readback.png" alt="Approval read-back">
-      <p class="figcap">Figure 2. "Sabse sasta wala" → cheapest option with fare, timing and refund rule read back before asking for approval.</p>
+      <h3 style="margin-top:0">What the prototype proves, and what it doesn't</h3>
+      <table>
+        <tr><th>Component</th><th>Status</th></tr>
+        <tr><td>LLM understanding with schema and server validation</td><td><span class="pill p-k">Working</span></td></tr>
+        <tr><td>Context harness: guards, budget, ledger, validator</td><td><span class="pill p-k">Working</span></td></tr>
+        <tr><td>Offline fallback engine and Hinglish date parsing</td><td><span class="pill p-k">Working</span></td></tr>
+        <tr><td>Indic text-to-speech via server</td><td><span class="pill p-k">Working</span></td></tr>
+        <tr><td>Journey analytics, latency p50/p90</td><td><span class="pill p-k">Working</span></td></tr>
+        <tr><td>Train, bus and flight inventory</td><td><span class="pill p-m">Sandbox</span></td></tr>
+        <tr><td>UPI, bank callbacks, refunds</td><td><span class="pill p-m">Sandbox</span></td></tr>
+      </table>
+      <p class="small">27 automated tests cover the harness, refund maths and every payment-failure journey. A 30-utterance English/Hindi/Hinglish eval set acts as a regression floor; a production set would come from real search and support language.</p>
     </div>
     <div>
-      <img class="shot" src="../../public/docs/v2_payment_failure_lab.png" alt="Payment failure lab">
-      <p class="figcap">Figure 3. Fare held for 10 minutes, in-app UPI, and the failure lab used to test every payment pattern.</p>
+      <h3 style="margin-top:0">Assumptions log</h3>
+      <table>
+        <tr><th>Assumption</th><th>How to test</th></tr>
+        <tr><td>Hindi-first users leak most at search and payment</td><td>Funnel by app language and city tier</td></tr>
+        <tr><td>Fear of a wrong booking outweighs price for first-timers</td><td>Interviews; review-page dwell time</td></tr>
+        <tr><td>Debit-without-ticket is a top-5 support driver</td><td>Support intent tagging</td></tr>
+        <tr><td>Trains have the most first-time bookers</td><td>First-booking share by mode</td></tr>
+        <tr><td>Voice won't raise wrong bookings with read-back</td><td>Pilot guardrail</td></tr>
+      </table>
     </div>
   </div>
-  <img class="shot" src="../../public/docs/v2_insights.png" alt="Insights" style="width:48%; display:block; margin: 2pt auto 0">
-  <p class="figcap" style="text-align:center">Figure 4. Insights panel: funnel with step conversion, voice-specific efficiency metrics, latency p50/p90 and the context trace, all from live events.</p>
-
-  <p class="small" style="margin-top:8pt"><b>Evaluation approach:</b> a golden set of utterances scored for intent and slot accuracy, run on every change for both the LLM and the fallback path. The current 30-utterance set passes at 100% on the fallback, but I wrote it alongside the rules, so it is a regression floor. The first real task is a set mined from search logs and support transcripts. <b>Tests:</b> 22 TypeScript tests (harness guards, grounding, refund maths, full journeys including every payment-failure pattern) and 5 Python tests (server-side validation, fallback). Code and docs: github.com/devanshudhoble/namanai</p>
-</section>
+  <div class="foot"><span>Say it once. Book it safely.</span><span>13</span></div>
+</div>
 
 </body>
 </html>
