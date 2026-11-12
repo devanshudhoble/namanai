@@ -11,14 +11,60 @@ A working prototype plus a product case study, built around one idea: **with mon
 
 ---
 
-## The four focus areas
+## Product focus areas
 
-| Focus | What's built | Where |
+Each area below is framed the way it would be run in a product team: the customer problem, what the prototype does about it, and the metric it is accountable to.
+
+### 1. Context engineering & the agent harness: the foundation
+> **Problem:** LLMs are good at understanding Hinglish but can't be trusted with fares, PNRs or payment secrets. In a payments-adjacent flow, one hallucinated price is a support escalation.
+
+| Harness layer | What it guarantees | Implementation |
 |---|---|---|
-| **AI-driven analytics for customer journeys** | Event-based funnel with step conversion and drop-off stage, turns-to-options, slots per turn, LLM-vs-fallback share, latency p50/p90. All measured, none hardcoded | `src/services/analytics.ts`, Insights drawer |
-| **Optimising booking conversions** | One-sentence multi-slot understanding, asks only for missing details, cross-mode cheapest/fastest, read-back + explicit approval, 10-min fare hold | `src/services/nlu.ts`, `voiceAgentOrchestrator.ts` |
-| **Payment & cancellation patterns** | UPI failure taxonomy, idempotent retry, 3-way reconciliation (bank ↔ ledger ↔ inventory) with 4 real outcomes, refund quote before cancel | `src/services/paymentEngine.ts`, failure lab in the UI |
-| **Real-world travel use cases** | 6 demo scenarios + 5 payment failure simulations | `ScenarioPresets.tsx`, `TravelCanvas.tsx` |
+| **Credential guard** | A UPI PIN, OTP or card number is blocked before it is stored, logged or sent to a model | `checkCredentials()`, stage-aware (a bare `4821` is blocked at payment) |
+| **PII redaction** | Phone and account numbers never leave the device for the LLM | `redact()` |
+| **Layered context assembly** | The model sees policy → slot state → options on screen → last 6 turns, in that priority | `buildNluContext()` |
+| **Token budget** | ≤ 1,200 tokens per turn: predictable latency and cost; old dialogue trimmed first, policy and state never dropped | per-turn `ContextTrace` |
+| **Structured output + server validation** | Gemini returns schema-constrained JSON; the server rejects past dates, implausible traveller counts and injection-like input | `backend/routes/agent.py` |
+| **Deterministic override** | For "yes", "no" and payment complaints, rules win over the model | `understand()` merge policy |
+| **Slot ledger with provenance** | Every captured detail records its source (LLM / rules / UI) and turn, so it is debuggable and measurable | `applySlots()` |
+| **Grounding validator** | Every ₹ amount and booking code in a reply must exist in tool output, or the reply is blocked | `validateReply()` |
+| **Graceful degradation** | If the LLM is slow or down, an offline engine with the same output shape takes over mid-conversation | `src/services/nlu.ts` |
+
+**Design principle:** *the LLM understands, tools decide, templates speak.* This turns "the agent never invents a fare" from a prompt instruction into an enforced, tested guarantee.
+**Accountable to:** ungrounded-claim blocks per 1k turns → 0 · PIN/OTP reaching the LLM or logs = 0 · turn latency p90 ≤ 2.5 s.
+📖 [Full design: docs/CONTEXT_ENGINEERING.md](docs/CONTEXT_ENGINEERING.md)
+
+### 2. AI-driven analytics for customer journeys
+> **Problem:** Voice journeys fail in ways a page-view funnel can't see: too many turns, misunderstandings, silence while the agent thinks.
+
+- Session-level event stream with **funnel step conversion** and **drop-off stage** for abandoned sessions
+- Voice-specific metrics: **median turns to options**, **trip details captured per turn**, **LLM vs fallback share**
+- **Latency p50/p90** per stage (understanding, tools, TTS, full turn), all measured and none hardcoded
+
+**Accountable to:** median turns to options ≤ 2 · step conversion vs form baseline. · `src/services/analytics.ts`, Insights drawer
+
+### 3. Optimising booking conversions
+> **Problem:** Forms make users pick cities, dates, travellers and modes one field at a time, and compare modes across separate tabs.
+
+- **One-sentence booking:** all trip details extracted from a single Hinglish utterance
+- **Ask only what's missing**, then **cross-mode comparison** with the fastest and cheapest named out loud
+- **"Cheapest? Fastest? One day later?"** re-ranks or re-searches without restarting
+- **Read-back + explicit approval** before any booking; **10-minute fare hold** during payment
+
+**Accountable to:** search-to-booking conversion (primary) · wrong-booking rate (guardrail). · `voiceAgentOrchestrator.ts`
+
+### 4. Payment & cancellation patterns
+> **Problem:** "Payment failed" and "money deducted, ticket pending" are among the costliest support contacts in online travel.
+
+- **UPI failure taxonomy** (declined, bank timeout, insufficient balance) with reassurance and a held fare
+- **Idempotent retry** on the same order id, so a customer can never be double-charged
+- **3-way reconciliation** (bank ↔ ledger ↔ inventory) with four outcomes decided from order state: issue ticket, full auto-refund, no debit found, no order
+- **Cancellation quote before confirm:** paid − fee (per traveller, depends on time to departure) − non-refundable convenience fee
+
+**Accountable to:** payment-related tickets per 1k bookings · first-attempt payment success. · `paymentEngine.ts`, failure lab
+
+### 5. Real-world use cases from travel platforms
+Six demo scenarios (one-shot Hinglish booking, partial intent, price-sensitive comparison, baggage question, PIN-leak attempt, post-booking cancellation) plus five payment-failure simulations, all reproducible in the UI and covered by end-to-end tests.
 
 ## Screens
 
