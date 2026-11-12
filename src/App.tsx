@@ -3,11 +3,13 @@ import { Header } from './components/Header';
 import { VoiceVisualizer } from './components/VoiceVisualizer';
 import { ConversationalFeed } from './components/ConversationalFeed';
 import { TravelCanvas } from './components/TravelCanvas';
-import { ApiSettingsModal } from './components/ApiSettingsModal';
+import { AnalyticsDrawer } from './components/AnalyticsDrawer';
+import { ScenarioPresets } from './components/ScenarioPresets';
 import { VoiceAgentOrchestrator, AgentContext } from './services/voiceAgentOrchestrator';
 import { speechService } from './services/speechService';
-import { ApiKeysConfig, TravelOption } from './types';
-import { Home, Ticket, Mic, CreditCard, User, Sparkles, Plane, Train, Bus, Hotel } from 'lucide-react';
+import type { UpiFailureReason } from './services/paymentEngine';
+import { TravelOption } from './types';
+import { Home, Ticket, Mic, CreditCard, BarChart3, Plane, Train, Bus, Hotel } from 'lucide-react';
 
 export function App() {
   const [context, setContext] = useState<AgentContext | null>(null);
@@ -15,8 +17,7 @@ export function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [interimTranscript, setInterimTranscript] = useState('');
   const [dialect, setDialect] = useState('en-IN');
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [apiConfig, setApiConfig] = useState<ApiKeysConfig>({ mode: 'sandbox' });
+  const [isInsightsOpen, setIsInsightsOpen] = useState(false);
 
   const orchestratorRef = useRef<VoiceAgentOrchestrator | null>(null);
 
@@ -39,6 +40,10 @@ export function App() {
       speechService.stopListening();
     };
   }, []);
+
+  useEffect(() => {
+    speechService.setLanguage(dialect === 'hinglish' ? 'hi-IN' : 'en-IN');
+  }, [dialect]);
 
   // Toggle Microphone
   const handleToggleMic = () => {
@@ -98,12 +103,12 @@ export function App() {
     orchestratorRef.current?.handleSimulatedPaymentApproval();
   };
 
-  const handleSimulateDeductionPending = () => {
-    orchestratorRef.current?.handlePaymentDeductedException();
+  const handlePaymentFailure = (reason: UpiFailureReason) => {
+    orchestratorRef.current?.paymentFailed(reason);
   };
 
-  const handleSimulatePaymentDecline = () => {
-    orchestratorRef.current?.handleUserUtterance('My payment failed on Google Pay', true);
+  const handleSimulateDebited = (soldOut: boolean) => {
+    orchestratorRef.current?.simulateDebitedButPending(soldOut);
   };
 
   const handleReset = () => {
@@ -125,9 +130,8 @@ export function App() {
     <div className="min-h-screen bg-[#F4F7FB] text-slate-800 flex flex-col font-['Plus_Jakarta_Sans'] pb-20">
       {/* Header */}
       <Header
-        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenSettings={() => setIsInsightsOpen(true)}
         onReset={handleReset}
-        latencyMs={context.telemetry.totalLatencyMs}
       />
 
       {/* Main Content Layout */}
@@ -147,7 +151,7 @@ export function App() {
               Aapka Travel AI Concierge — Bol ke book karo
             </h2>
             <p className="text-xs text-blue-100 font-medium max-w-xl">
-              Flight, Train (IRCTC), Bus ya Hotel — bas natural voice mein boliye, real-time availability check karke instant UPI se secure booking karein.
+              Flight, train, bus ya hotel: ek line mein boliye. Agent sirf missing details poochega, fare dikhayega, aapki haan ke baad hi UPI se book karega.
             </p>
           </div>
 
@@ -184,6 +188,8 @@ export function App() {
           </div>
         </div>
 
+        <ScenarioPresets onTriggerScenario={handleTriggerScenario} isProcessing={context.isThinking} />
+
         {/* 2-Column Responsive Workspace */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
           {/* Left Column: Voice Assistant & Dialogue Stream */}
@@ -201,7 +207,8 @@ export function App() {
             <ConversationalFeed
               messages={context.messages}
               onSendMessage={handleSendMessage}
-              isProcessing={context.step === 'processing' || context.step === 'discovering'}
+              isProcessing={context.isThinking}
+              nluSource={context.nluSource}
             />
           </div>
 
@@ -219,9 +226,12 @@ export function App() {
               passengersCount={context.passengersCount}
               onSelectOption={handleSelectOption}
               onApprovePayment={handleApprovePayment}
-              onSimulateDeductionPending={handleSimulateDeductionPending}
-              onSimulatePaymentDecline={handleSimulatePaymentDecline}
+              onPaymentFailure={handlePaymentFailure}
+              onSimulateDebited={handleSimulateDebited}
               onVoiceSupportQuery={handleSendMessage}
+              refundQuote={context.refundQuote}
+              refund={context.refund}
+              auditTrail={context.auditTrail}
             />
           </div>
         </div>
@@ -262,30 +272,24 @@ export function App() {
           </div>
 
           <button
-            onClick={() => handleSendMessage('My money has been deducted from Google Pay but ticket pending')}
+            onClick={() => handleSendMessage('My money was deducted but ticket is pending')}
             className="flex flex-col items-center space-y-1 text-slate-500 hover:text-slate-800 transition cursor-pointer"
           >
             <CreditCard className="w-5 h-5" />
-            <span className="text-[10px] font-medium">UPI & Reco</span>
+            <span className="text-[10px] font-medium">Help</span>
           </button>
 
           <button
-            onClick={() => setIsSettingsOpen(true)}
+            onClick={() => setIsInsightsOpen(true)}
             className="flex flex-col items-center space-y-1 text-slate-500 hover:text-slate-800 transition cursor-pointer"
           >
-            <User className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Account</span>
+            <BarChart3 className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Insights</span>
           </button>
         </div>
       </nav>
 
-      {/* API Integrations Settings Modal */}
-      <ApiSettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        config={apiConfig}
-        onSaveConfig={setApiConfig}
-      />
+      <AnalyticsDrawer isOpen={isInsightsOpen} onClose={() => setIsInsightsOpen(false)} />
     </div>
   );
 }

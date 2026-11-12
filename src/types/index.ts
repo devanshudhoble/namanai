@@ -56,6 +56,7 @@ export type AgentStateStep =
   | 'payment_verifying'
   | 'payment_exception_recovery'
   | 'confirmed'
+  | 'cancellation_quoted'
   | 'cancelled';
 
 export interface PassengerDetails {
@@ -76,7 +77,9 @@ export interface BookingHold {
   holdExpiresAt: number; // timestamp ms
   fareGuaranteed: boolean;
   amount: number;
-  status: 'held' | 'paid' | 'expired' | 'released' | 'reconciled';
+  passengers: number;
+  travelDateISO: string | null;
+  status: 'held' | 'paid' | 'expired' | 'released' | 'reconciled' | 'cancelled' | 'refunded';
 }
 
 export interface Message {
@@ -96,36 +99,33 @@ export interface Message {
   isSpoken?: boolean;
 }
 
-export interface TelemetryMetrics {
-  totalLatencyMs: number;
-  sttLatencyMs: number;
-  llmReasoningMs: number;
-  apiToolLatencyMs: number;
-  ttsTtfbMs: number;
-  hesitationDetected: boolean;
-  hesitationDurationSec: number;
-  hallucinationRate: string;
-  groundingStatus: 'VERIFIED_API' | 'HELD_INVENTORY' | 'RECONCILED';
-}
-
 export interface PaymentTransaction {
   transactionId: string;
   orderId: string;
-  gateway: 'UPI_INTENT' | 'RAZORPAY_SANDBOX' | 'CASHFREE';
+  gateway: 'PAYTM_UPI_INTENT' | 'UPI_COLLECT';
   amount: number;
   currency: string;
   upiVpa: string;
-  status: 'PENDING' | 'PUSHED' | 'CAPTURED' | 'FAILED' | 'RECONCILED';
+  status: 'PENDING' | 'PUSHED' | 'CAPTURED' | 'FAILED' | 'DEBITED_PENDING' | 'RECONCILED' | 'REFUNDED';
   failureReason?: string;
   initiatedAt: string;
   completedAt?: string;
   reconciliationLog: string[];
 }
 
-export interface ApiKeysConfig {
-  geminiKey?: string;
-  openaiKey?: string;
-  elevenlabsKey?: string;
-  amadeusKey?: string;
-  mode: 'sandbox' | 'live';
+export interface RefundQuote {
+  orderId: string;
+  paidAmount: number;
+  cancellationFee: number;
+  nonRefundableConvenienceFee: number;
+  refundAmount: number;
+  hoursToDeparture: number | null;
+  rule: string;
+}
+
+export interface RefundRecord extends RefundQuote {
+  refundId: string;
+  initiatedAt: string;
+  destination: string;
+  eta: string;
 }

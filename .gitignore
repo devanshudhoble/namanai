@@ -36,3 +36,9 @@ __pycache__/
 *$py.class
 venv/
 .venv/
+
+# Example env files are documentation, keep them
+!.env.example
+!backend/.env.example
+.venv*/
+.pytest_cache/

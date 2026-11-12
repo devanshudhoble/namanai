@@ -3,12 +3,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from routes import travel, payments, voice
+from routes import travel, payments, voice, agent
 
 app = FastAPI(
-    title="VoyAI Naman - Autonomous Voice AI Travel Concierge Engine",
-    description="Production-grade API for Voice AI Travel Booking, Out-of-band Payments & GDS Grounding",
-    version="1.0.0"
+    title="VoyAI Naman - Voice Travel Booking Agent (prototype)",
+    description="Gemini NLU + Sarvam TTS proxy (real) and sandbox travel / payment endpoints (simulated).",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -22,14 +22,17 @@ app.add_middleware(
 app.include_router(travel.router)
 app.include_router(payments.router)
 app.include_router(voice.router)
+app.include_router(agent.router)
 
 @app.get("/health")
 async def health_check():
     return {
         "status": "HEALTHY",
-        "service": "VoyAI Autonomous Engine",
-        "gds_grounding": "ACTIVE",
-        "payment_guard": "OUT_OF_BAND_UPI"
+        "service": "VoyAI Naman",
+        "llm_configured": bool(os.getenv("GEMINI_API_KEY")),
+        "tts_configured": bool(os.getenv("SARVAM_API_KEY")),
+        "travel_inventory": "SANDBOX",
+        "payments": "SANDBOX"
     }
 
 # Static Files & SPA Frontend Serving
@@ -76,7 +79,7 @@ else:
                 "/api/payments/upi-push",
                 "/api/payments/reconcile",
                 "/api/voice/sarvam-tts",
-                "/api/voice/gemini-reasoning"
+                "/api/agent/understand"
             ]
         }
 

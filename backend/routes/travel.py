@@ -1,3 +1,4 @@
+"""SANDBOX travel inventory. Not used by the web app (which has its own sandbox engine); kept as an API contract sketch for a real GDS / IRCTC / bus-aggregator integration."""
 from fastapi import APIRouter, HTTPException
 from typing import List
 from models import SearchRequest, TravelOptionResponse, LockHoldRequest, LockHoldResponse

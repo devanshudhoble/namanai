@@ -1,822 +1,745 @@
-import {
+// Voice agent orchestrator.
+//
+// Turn pipeline:
+//   utterance -> credential guard -> NLU (Gemini via harness context, rules fallback)
+//             -> slot ledger -> policy/state machine -> tools (search / hold / pay / refund)
+//             -> templated reply from tool facts -> grounding validator -> TTS
+//
+// Design choice: the LLM understands, tools decide, templates speak.
+// That is what makes "never invent a fare or PNR" enforceable rather than a prompt wish.
+
+import type {
   AgentStateStep,
   BookingHold,
   Message,
   PassengerDetails,
   PaymentTransaction,
-  TelemetryMetrics,
+  RefundQuote,
+  RefundRecord,
   TravelOption,
 } from '../types';
-import { travelEngine, normalizeCityName } from './travelEngine';
-import { paymentEngine } from './paymentEngine';
+import { travelEngine } from './travelEngine';
+import { paymentEngine, quoteRefund, FAILURE_COPY, type UpiFailureReason } from './paymentEngine';
 import { speechService } from './speechService';
-import { contextHarness } from './contextHarness';
+import { contextHarness, type JourneyStage, type SlotKey } from './contextHarness';
+import { analytics } from './analytics';
+import { llmUnderstand } from './agentApi';
+import {
+  rulesUnderstand,
+  countSlots,
+  formatDisplayDate,
+  fromISODate,
+  toISODate,
+  INTENTS,
+  type Understanding,
+  type DialogueState,
+} from './nlu';
+
+export type ActiveQuestion = 'destination' | 'origin' | 'date' | 'passengers' | 'options' | 'approval' | 'name' | 'cancel_confirm' | 'none';
 
 export interface AgentContext {
   origin: string;
   destination: string;
-  date: string;
-  tripType: 'one-way' | 'return' | null;
-  returnDate: string | null;
+  date: string; // display
+  dateISO: string | null;
   passengersCount: number;
-  budget: number | null;
   modePreference: 'flight' | 'train' | 'bus' | 'hotel' | 'all' | null;
   selectedClass: string | null;
-  preferencesNote: string | null;
+  timePreference: string | null;
+  budget: number | null;
   passengerName: string;
-  preference: string;
   options: TravelOption[];
   selectedOption: TravelOption | null;
   hold: BookingHold | null;
   transaction: PaymentTransaction | null;
+  refundQuote: RefundQuote | null;
+  refund: RefundRecord | null;
+  auditTrail: string[];
   step: AgentStateStep;
   messages: Message[];
-  telemetry: TelemetryMetrics;
   waitingForApproval: boolean;
-  preferencesAsked: boolean;
-  activeQuestion: 'destination' | 'origin' | 'date' | 'tripType' | 'passengers' | 'mode' | 'preferences' | 'options' | 'approval' | 'name';
+  activeQuestion: ActiveQuestion;
+  nluSource: 'llm' | 'rules' | null;
+  isThinking: boolean;
 }
 
-const KNOWN_INDIAN_LOCATIONS = [
-  // Metros & Tier-2/3 Hubs
-  'jodhpur', 'jodpur', 'nagpur', 'mumbai', 'delhi', 'bengaluru', 'bangalore', 'pune', 'hyderabad', 'chennai',
-  'kolkata', 'ahmedabad', 'jaipur', 'lucknow', 'chandigarh', 'varanasi', 'bhopal',
-  'indore', 'patna', 'surat', 'kochi', 'cochin', 'goa', 'amritsar', 'manali', 'shimla',
-  'dehradun', 'ayodhya', 'shirdi', 'haridwar', 'rishikesh', 'udaipur', 'agra',
-  'vadodara', 'coimbatore', 'visakhapatnam', 'vizag', 'ranchi', 'raipur', 'guwahati',
-  'bhubaneswar', 'wardha', 'amravati', 'solapur', 'nashik', 'latur', 'nanded', 'kolhapur',
-  'mysore', 'mysuru', 'mangalore', 'kannur', 'kozhikode', 'thiruvananthapuram', 'trivandrum',
-  'madurai', 'tirupati', 'vijayawada', 'guntur', 'salem', 'trichy', 'pondicherry', 'puducherry',
-  'darjeeling', 'gangtok', 'shillong', 'siliguri', 'dhanbad', 'jamshedpur', 'gwalior', 'jabalpur',
-  'ujjain', 'kanpur', 'allahabad', 'prayagraj', 'meerut', 'bareilly', 'aligarh', 'moradabad',
-  // All Indian States & UTs
-  'kerala', 'kashmir', 'rajasthan', 'himachal', 'uttarakhand', 'punjab', 'haryana', 'gujarat',
-  'maharashtra', 'karnataka', 'tamil nadu', 'andhra pradesh', 'telangana', 'odisha', 'bihar',
-  'jharkhand', 'west bengal', 'assam', 'sikkim', 'meghalaya', 'tripura', 'manipur', 'mizoram',
-  'nagaland', 'arunachal pradesh', 'ladakh', 'jammu', 'chhattisgarh', 'madhya pradesh', 'uttar pradesh'
-];
+const WELCOME = 'Namaste! Where would you like to travel? You can say it all at once, like "Mumbai to Nagpur next Friday, 2 people, train".';
 
-// Context-aware Indian Date Parser using current calendar date
-export function parseIndianDateInput(text: string, referenceDate: Date = new Date()): string | null {
-  const clean = text.trim();
-  const lower = clean.toLowerCase();
-  const currentDay = referenceDate.getDate();
-  const currentMonth = referenceDate.getMonth(); // 0-indexed
-  const currentYear = referenceDate.getFullYear();
+const QUESTIONS: Record<'destination' | 'origin' | 'date' | 'passengers', (c: AgentContext) => string> = {
+  destination: () => 'Where would you like to go?',
+  origin: (c) => `Where will you be travelling from to ${c.destination}?`,
+  date: (c) => `When would you like to travel${c.destination ? ` to ${c.destination}` : ''}?`,
+  passengers: () => 'How many people are travelling?',
+};
 
-  // 1. Relative keywords
-  if (lower === 'today' || lower === 'aaj') {
-    return `Today (${referenceDate.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
-  }
-  if (lower === 'tomorrow' || lower === 'kal') {
-    const tmrw = new Date(referenceDate);
-    tmrw.setDate(currentDay + 1);
-    return `Tomorrow (${tmrw.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
-  }
-  if (lower === 'day after tomorrow' || lower === 'parso') {
-    const dayAfter = new Date(referenceDate);
-    dayAfter.setDate(currentDay + 2);
-    return `Day After Tomorrow (${dayAfter.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
-  }
-  if (lower === 'weekend' || lower === 'this weekend') {
-    const sat = new Date(referenceDate);
-    const dayOfWeek = referenceDate.getDay();
-    const diff = (6 - dayOfWeek + 7) % 7 || 7;
-    sat.setDate(currentDay + diff);
-    return `This Weekend (${sat.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })})`;
-  }
+const SLOT_TO_QUESTION: Record<string, 'destination' | 'origin' | 'date' | 'passengers'> = {
+  destination: 'destination',
+  origin: 'origin',
+  dateISO: 'date',
+  passengers: 'passengers',
+};
 
-  // 2. Named Weekdays (e.g. "Friday", "Next Friday", "Somwar", "Monday")
-  const weekdaysMap: Record<string, number> = {
-    sunday: 0, itwar: 0, ravivar: 0,
-    monday: 1, somwar: 1,
-    tuesday: 2, mangalwar: 2,
-    wednesday: 3, budhwar: 3,
-    thursday: 4, guruwar: 4, veervar: 4,
-    friday: 5, shukrawar: 5,
-    saturday: 6, shaniwar: 6,
-  };
-  for (const [dayName, targetDayNum] of Object.entries(weekdaysMap)) {
-    if (lower.includes(dayName)) {
-      const isNext = lower.includes('next') || lower.includes('agle') || lower.includes('agla');
-      const target = new Date(referenceDate);
-      let diff = (targetDayNum - referenceDate.getDay() + 7) % 7;
-      if (diff === 0 || isNext) diff += 7;
-      target.setDate(currentDay + diff);
-      return target.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    }
-  }
-
-  // 3. User says a pure number or date with suffix like:
-  // "4", "5", "4th", "5th", "4 ko", "5 tarikh", "4 nov", "4/11", "25", "12"
-  const dateNumMatch = clean.match(/(?:^|\b)(?:on\s+)?(\d{1,2})(?:st|nd|rd|th)?(?:\s*(?:ko|tarikh|tareekh|nov|november|dec|december|jan|january|feb|mar|apr|may|jun|jul|aug|sep|oct)?)?(?:\b|$)/i);
-  if (dateNumMatch) {
-    const day = parseInt(dateNumMatch[1], 10);
-    if (day >= 1 && day <= 31) {
-      let targetMonth = currentMonth;
-      let targetYear = currentYear;
-      // If current day is 2nd Nov and user says "4", day >= currentDay -> Nov 4th.
-      // If day < currentDay (e.g. user says 1 when today is 2nd), target next month!
-      if (day < currentDay) {
-        targetMonth = (currentMonth + 1) % 12;
-        if (targetMonth === 0) targetYear += 1;
-      }
-      const targetDate = new Date(targetYear, targetMonth, day);
-      return targetDate.toLocaleDateString('en-IN', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-        year: 'numeric'
-      });
-    }
-  }
-
-  return null;
+function durationMinutes(d: string): number {
+  const h = d.match(/(\d+)\s*h/);
+  const m = d.match(/(\d+)\s*m/);
+  return (h ? parseInt(h[1], 10) * 60 : 0) + (m ? parseInt(m[1], 10) : 0) || 99999;
 }
 
-function extractCityFromText(text: string): { destination?: string; origin?: string } {
-  const lower = text.toLowerCase();
-  let destination: string | undefined;
-  let origin: string | undefined;
-
-  // Pattern: "from X to Y" or "X to Y" or "X se Y"
-  const fromToMatch = text.match(/(?:from|se)\s+([A-Za-z]+)\s+(?:to|tak)\s+([A-Za-z]+)/i);
-  if (fromToMatch) {
-    origin = normalizeCityName(fromToMatch[1]);
-    destination = normalizeCityName(fromToMatch[2]);
-    return { origin, destination };
-  }
-
-  const directToMatch = text.match(/([A-Za-z]+)\s+(?:to|se)\s+([A-Za-z]+)/i);
-  if (directToMatch && KNOWN_INDIAN_LOCATIONS.includes(directToMatch[1].toLowerCase()) && KNOWN_INDIAN_LOCATIONS.includes(directToMatch[2].toLowerCase())) {
-    origin = normalizeCityName(directToMatch[1]);
-    destination = normalizeCityName(directToMatch[2]);
-    return { origin, destination };
-  }
-
-  // Pattern: "to [City]" or "for [City]" or "visit [City]" or "[City] jana hai"
-  const toMatch = text.match(/(?:to|for|reach|visit|in)\s+([A-Za-z]+)/i);
-  if (toMatch) {
-    destination = normalizeCityName(toMatch[1]);
-  }
-
-  const fromMatch = text.match(/(?:from|starting from|leaving from|origin)\s+([A-Za-z]+)/i);
-  if (fromMatch) {
-    origin = normalizeCityName(fromMatch[1]);
-  }
-
-  const janaHaiMatch = text.match(/([A-Za-z]+)\s+(?:jana|ghoomne|pahunchna)/i);
-  if (janaHaiMatch && !destination) {
-    destination = normalizeCityName(janaHaiMatch[1]);
-  }
-
-  const seMatch = text.match(/([A-Za-z]+)\s+se\b/i);
-  if (seMatch && !origin) {
-    origin = normalizeCityName(seMatch[1]);
-  }
-
-  // Match known Indian cities directly in text
-  for (const city of KNOWN_INDIAN_LOCATIONS) {
-    if (lower.includes(city)) {
-      const cap = normalizeCityName(city);
-      if (!destination && !origin) {
-        destination = cap;
-      }
-    }
-  }
-
-  return { destination, origin };
+function departureHour(t: string): number {
+  const m = t.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/i);
+  if (!m) return 12;
+  let h = parseInt(m[1], 10) % 12;
+  if (m[3].toUpperCase() === 'PM') h += 12;
+  return h;
 }
+
+/** Spoken name: trains are known by name/number, flights and buses by operator + number. */
+const label = (o: TravelOption) => (o.mode === 'train' ? o.serviceNumber : `${o.provider} ${o.serviceNumber}`);
+
+const inr = (n: number) => `₹${Math.round(n).toLocaleString('en-IN')}`;
 
 export class VoiceAgentOrchestrator {
   private context: AgentContext;
   private onStateChange: (ctx: AgentContext) => void;
-  private isProcessing: boolean = false;
+  private isProcessing = false;
 
   constructor(onStateChange: (ctx: AgentContext) => void) {
     this.onStateChange = onStateChange;
-    this.context = this.getInitialContext();
+    contextHarness.reset();
+    this.context = this.initialContext();
+    analytics.track('session_started');
   }
 
-  private getInitialContext(): AgentContext {
+  private initialContext(): AgentContext {
     return {
       origin: '',
       destination: '',
       date: '',
-      tripType: null,
-      returnDate: null,
+      dateISO: null,
       passengersCount: 0,
-      budget: null,
       modePreference: null,
       selectedClass: null,
-      preferencesNote: null,
+      timePreference: null,
+      budget: null,
       passengerName: '',
-      preference: 'Convenience',
       options: [],
       selectedOption: null,
       hold: null,
       transaction: null,
+      refundQuote: null,
+      refund: null,
+      auditTrail: [],
       step: 'idle',
       waitingForApproval: false,
-      preferencesAsked: false,
       activeQuestion: 'destination',
-      messages: [
-        {
-          id: 'msg-welcome',
-          role: 'agent',
-          text: 'Namaste! Where would you like to travel today?',
-          timestamp: new Date().toLocaleTimeString(),
-          isSpoken: true,
-        },
-      ],
-      telemetry: {
-        totalLatencyMs: 0,
-        sttLatencyMs: 240,
-        llmReasoningMs: 290,
-        apiToolLatencyMs: 180,
-        ttsTtfbMs: 190,
-        hesitationDetected: false,
-        hesitationDurationSec: 0,
-        hallucinationRate: '0.0% (Strict API Grounding)',
-        groundingStatus: 'VERIFIED_API',
-      },
+      nluSource: null,
+      isThinking: false,
+      messages: [{ id: 'msg-welcome', role: 'agent', text: WELCOME, timestamp: new Date().toLocaleTimeString(), isSpoken: true }],
     };
   }
 
-  public getContext(): AgentContext {
+  getContext() {
     return this.context;
   }
 
-  public reset(): void {
+  private emit() {
+    this.onStateChange({ ...this.context });
+  }
+
+  reset() {
     speechService.stopSpeaking();
     speechService.stopListening();
     travelEngine.resetInventory();
-    this.context = this.getInitialContext();
-    this.onStateChange({ ...this.context });
+    contextHarness.reset();
+    analytics.newSession();
+    this.context = this.initialContext();
+    analytics.track('session_started');
+    this.emit();
   }
 
-  public interruptSpeech(): void {
+  interruptSpeech() {
     speechService.stopSpeaking();
-    this.appendMessage({
-      id: `int-${Date.now()}`,
-      role: 'system',
-      text: '⚡ Barge-in: Listening to traveler...',
-      timestamp: new Date().toLocaleTimeString(),
-    });
+    this.system('Barge-in: agent stopped speaking, listening to traveller');
   }
 
-  private appendMessage(msg: Message) {
-    this.context.messages = [...this.context.messages, msg];
-    this.onStateChange({ ...this.context });
+  private stage(): JourneyStage {
+    const c = this.context;
+    if (c.step === 'payment_exception_recovery') return 'support';
+    if (c.step === 'confirmed' || c.step === 'cancellation_quoted' || c.step === 'cancelled') return 'post_booking';
+    if (c.transaction && (c.step === 'payment_pushed' || c.step === 'payment_verifying')) return 'pay';
+    if (c.waitingForApproval || c.activeQuestion === 'name') return 'approve';
+    if (c.options.length) return 'compare';
+    return 'discover';
   }
 
-  public async handleUserUtterance(text: string, voiceTrigger: boolean = true) {
+  private dialogueState(): DialogueState {
+    const c = this.context;
+    return {
+      activeQuestion: c.activeQuestion,
+      hasOptions: c.options.length > 0 && !c.hold,
+      awaitingApproval: c.waitingForApproval,
+      awaitingCancelConfirm: c.activeQuestion === 'cancel_confirm',
+      hasConfirmedBooking: Boolean(c.hold && (c.hold.status === 'paid' || c.hold.status === 'reconciled')),
+      hasPendingPayment: Boolean(c.transaction && c.transaction.status === 'PUSHED'),
+      today: new Date(),
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // NLU: LLM first, rules fallback. Both return the same shape.
+  // ---------------------------------------------------------------------------
+  private async understand(text: string): Promise<Understanding> {
+    const state = this.dialogueState();
+    const rules = rulesUnderstand(text, state);
+    const t0 = performance.now();
+
+    const todayISO = toISODate(new Date());
+    const prompt = contextHarness.buildNluContext(this.stage(), this.context.activeQuestion, this.context.messages, todayISO);
+    const redacted = contextHarness.redact(text).text;
+    const res = await llmUnderstand(redacted, prompt, todayISO);
+    analytics.timing('nlu_ms', performance.now() - t0);
+
+    if (res?.ok && res.understanding && INTENTS.includes(res.understanding.intent)) {
+      const llm: Understanding = { ...res.understanding, slots: res.understanding.slots ?? {}, source: 'llm' };
+      // Deterministic overrides where rules are provably safer than the model:
+      // payment/support intents and confirmation words are high-stakes, so rules win when they fire.
+      if (['payment_issue', 'payment_failed', 'approve', 'decline'].includes(rules.intent)) {
+        return { ...llm, intent: rules.intent };
+      }
+      // Fill any slot the LLM missed but rules caught (e.g. a bare "2" to the passenger question)
+      return { ...llm, slots: { ...rules.slots, ...llm.slots } };
+    }
+    return rules;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Main turn handler
+  // ---------------------------------------------------------------------------
+  async handleUserUtterance(text: string, voice = true) {
     if (this.isProcessing || !text.trim()) return;
     this.isProcessing = true;
+    const t0 = performance.now();
     speechService.stopSpeaking();
+    contextHarness.nextTurn();
+    analytics.track('user_turn');
 
-    const startTime = performance.now();
-    const userMsg: Message = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      text,
-      timestamp: new Date().toLocaleTimeString(),
-    };
-    this.appendMessage(userMsg);
-
-    const lower = text.toLowerCase();
-
-    // Context Harness Security Guardrail
-    const safety = contextHarness.sanitizeUserUtterance(text);
-    if (!safety.isSafe) {
-      this.appendMessage({
-        id: `sec-${Date.now()}`,
-        role: 'system',
-        text: `🛡️ ${safety.warning}`,
-        timestamp: new Date().toLocaleTimeString(),
-      });
-      const warningSpeech = "For your security, never share your UPI PIN or password over voice. We only use authorized out-of-band payment apps.";
-      if (voiceTrigger) speechService.speak(warningSpeech);
+    // 1. Credential guard runs BEFORE the text is stored, logged or sent anywhere
+    const guard = contextHarness.checkCredentials(text, this.stage());
+    if (!guard.safe) {
+      analytics.track('credential_blocked', { reason: guard.reason ?? 'unknown' });
+      this.context.messages = [
+        ...this.context.messages,
+        { id: `user-${Date.now()}`, role: 'user', text: '•••• (hidden for your safety)', timestamp: new Date().toLocaleTimeString() },
+      ];
+      this.reply(
+        'Please never share your UPI PIN, OTP or card number with anyone, including me. You only enter your PIN inside the UPI app.',
+        'CREDENTIAL_BLOCKED',
+        t0,
+        voice
+      );
       this.isProcessing = false;
       return;
     }
 
-    // SCENARIO: Payment Deducted / Ticket Pending Exception Recovery
-    if (
-      lower.includes('deducted') ||
-      lower.includes('cut gaya') ||
-      lower.includes('kat gaye') ||
-      lower.includes('not confirmed') ||
-      lower.includes('ticket pending') ||
-      lower.includes('paise cut')
-    ) {
-      await this.handlePaymentDeductedException(startTime, voiceTrigger);
+    this.append({ id: `user-${Date.now()}`, role: 'user', text, timestamp: new Date().toLocaleTimeString() });
+    this.context.isThinking = true;
+    this.emit();
+
+    try {
+      const u = await this.understand(text);
+      this.context.nluSource = u.source;
+      analytics.track('nlu_result', { source: u.source, intent: u.intent, slotsFilled: countSlots(u.slots) });
+      await this.route(u, t0, voice);
+    } finally {
+      this.context.isThinking = false;
+      analytics.timing('turn_ms', performance.now() - t0);
+      this.emit();
       this.isProcessing = false;
-      return;
     }
-
-    // SCENARIO: Baggage or Cancellation Policy Query
-    if (
-      lower.includes('baggage') ||
-      lower.includes('check-in') ||
-      lower.includes('luggage') ||
-      lower.includes('cancellation') ||
-      lower.includes('refund') ||
-      lower.includes('rules')
-    ) {
-      await this.handleBaggageAndCancellationQuery(startTime, voiceTrigger);
-      this.isProcessing = false;
-      return;
-    }
-
-    // SCENARIO: Passenger Name Provided (after approval was granted)
-    const nameMatch = text.match(/(?:my name is|name is|i am|for|passenger is|traveler is)\s+([A-Za-z\s]+)/i);
-    const words = text.trim().split(/\s+/);
-    const isNameAnswer =
-      (this.context.activeQuestion === 'name' || this.context.waitingForApproval) &&
-      !this.context.passengerName &&
-      (nameMatch || (words.length <= 3 && !['yes', 'no', 'book', 'cancel', 'train', 'bus', 'flight', 'goa', 'nagpur', 'jodhpur', '3ac', '2ac', 'sleeper', 'haan', 'theek hai', '4', '5'].includes(lower)));
-
-    if (isNameAnswer) {
-      const capturedName = (nameMatch ? nameMatch[1] : text).trim();
-      if (capturedName.length >= 2) {
-        this.context.passengerName = capturedName;
-        this.context.activeQuestion = 'approval';
-        await this.handleExecuteSeatLockAndUpiPush(capturedName, startTime, voiceTrigger);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    // SCENARIO: Explicit Customer Booking Approval
-    if (this.context.waitingForApproval) {
-      if (
-        lower.includes('yes') ||
-        lower.includes('proceed') ||
-        lower.includes('confirm') ||
-        lower.includes('book') ||
-        lower.includes('haan') ||
-        lower.includes('sure') ||
-        lower.includes('kardo') ||
-        lower.includes('do it') ||
-        lower.includes('ok') ||
-        lower.includes('okay')
-      ) {
-        if (!this.context.passengerName) {
-          this.context.activeQuestion = 'name';
-          const resp = "Great! What is the primary passenger's full name for the ticket?";
-          this.appendMessage({
-            id: `agent-${Date.now()}`,
-            role: 'agent',
-            text: resp,
-            timestamp: new Date().toLocaleTimeString(),
-            intentDetected: 'SOLICIT_PASSENGER_NAME',
-          });
-          if (voiceTrigger) speechService.speak(resp);
-          this.isProcessing = false;
-          return;
-        }
-
-        await this.handleExecuteSeatLockAndUpiPush(this.context.passengerName, startTime, voiceTrigger);
-        this.isProcessing = false;
-        return;
-      } else if (lower.includes('no') || lower.includes('cancel') || lower.includes('wait') || lower.includes('nahi')) {
-        this.context.waitingForApproval = false;
-        this.context.activeQuestion = 'options';
-        const resp = "No problem! We haven't booked anything. Would you like to explore other timings, modes, or change the dates?";
-        this.appendMessage({
-          id: `agent-${Date.now()}`,
-          role: 'agent',
-          text: resp,
-          timestamp: new Date().toLocaleTimeString(),
-          intentDetected: 'BOOKING_DECLINED_BY_USER',
-        });
-        if (voiceTrigger) speechService.speak(resp);
-        this.isProcessing = false;
-        return;
-      }
-    }
-
-    // STEPWISE CONVERSATION ENGINE
-    await this.processStepwiseConversation(text, startTime, voiceTrigger);
-    this.isProcessing = false;
   }
 
-  // Core Step-by-Step State Machine
-  private async processStepwiseConversation(text: string, startTime: number, voiceTrigger: boolean) {
-    const lower = text.toLowerCase();
+  private async route(u: Understanding, t0: number, voice: boolean) {
+    const c = this.context;
 
-    // 1. EXTRACT DESTINATION & ORIGIN
-    const cityExtracted = extractCityFromText(text);
-
-    // Mid-conversation Destination Change
-    if (cityExtracted.destination && this.context.destination && cityExtracted.destination.toLowerCase() !== this.context.destination.toLowerCase()) {
-      this.context.destination = cityExtracted.destination;
-      this.context.options = [];
-      this.context.selectedOption = null;
-      this.context.waitingForApproval = false;
-      this.context.preferencesAsked = false;
-    } else if (cityExtracted.destination && !this.context.destination) {
-      this.context.destination = cityExtracted.destination;
+    switch (u.intent) {
+      case 'payment_issue':
+        return this.reconcile(t0, voice);
+      case 'payment_failed':
+        if (c.transaction?.status === 'PUSHED') return this.paymentFailed('USER_DECLINED', voice);
+        return this.reply("I don't see a payment in progress right now. If money was debited, say 'money deducted' and I'll check it with the bank.", 'PAYMENT_FAILED_NO_TXN', t0, voice);
+      case 'cancel_booking':
+        return this.quoteCancellation(t0, voice);
+      case 'ask_baggage':
+      case 'ask_cancellation_policy':
+        return this.policyAnswer(u.intent, t0, voice);
+      case 'booking_status':
+        return this.bookingStatus(t0, voice);
     }
 
-    if (cityExtracted.origin) {
-      this.context.origin = cityExtracted.origin;
-    }
-
-    // If destination is still unknown and user uttered a word
-    if (!this.context.destination) {
-      const trimmed = text.trim();
-      const singleWord = trimmed.split(/\s+/)[0];
-      if (singleWord.length >= 3 && !['yes', 'no', 'hello', 'hi', 'train', 'bus', 'flight', '4', '5'].includes(singleWord.toLowerCase())) {
-        this.context.destination = normalizeCityName(singleWord);
+    if (c.activeQuestion === 'cancel_confirm') {
+      if (u.intent === 'approve') return this.confirmCancellation(t0, voice);
+      if (u.intent === 'decline') {
+        c.activeQuestion = 'none';
+        c.step = 'confirmed';
+        c.refundQuote = null;
+        return this.reply('Okay, your booking stays as it is. Nothing has been cancelled.', 'CANCELLATION_ABORTED', t0, voice);
       }
     }
 
-    // 2. CONTEXT-AWARE DATE PARSER (Fix for "4", "5", "tomorrow", etc.)
-    // If the active question was "date" OR if we have destination and need date:
-    const parsedDate = parseIndianDateInput(text);
-    if (parsedDate && (this.context.activeQuestion === 'date' || !this.context.date)) {
-      this.context.date = parsedDate;
-    }
-
-    // 3. TRIP TYPE EXTRACTION (One-way vs Return)
-    if (lower.includes('one way') || lower.includes('one-way') || lower.includes('single') || lower.includes('sirf jana') || lower.includes('oneway')) {
-      this.context.tripType = 'one-way';
-    } else if (lower.includes('return') || lower.includes('round trip') || lower.includes('both ways') || lower.includes('roundtrip') || lower.includes('wapas')) {
-      this.context.tripType = 'return';
-    }
-
-    // 4. NUMBER OF TRAVELLERS EXTRACTION
-    // Only parse numbers as passenger count if we are NOT at the date step!
-    if (this.context.date || this.context.activeQuestion === 'passengers') {
-      const numMatch = text.match(/(\d+)\s*(?:people|persons|travellers|travelers|passengers|seats|tickets|log|adults)?/i);
-      if (lower.includes('just me') || lower.includes('solo') || lower.includes('alone') || lower.includes('single') || lower.includes('ek log') || lower.trim() === '1') {
-        this.context.passengersCount = 1;
-      } else if (lower.includes('two') || lower.includes('do log') || lower.includes('couple') || lower.trim() === '2') {
-        this.context.passengersCount = 2;
-      } else if (lower.includes('three') || lower.includes('teen log') || lower.trim() === '3') {
-        this.context.passengersCount = 3;
-      } else if (lower.includes('four') || lower.includes('char log') || (lower.trim() === '4' && this.context.activeQuestion === 'passengers')) {
-        this.context.passengersCount = 4;
-      } else if (numMatch && this.context.activeQuestion === 'passengers') {
-        const parsed = parseInt(numMatch[1], 10);
-        if (parsed > 0) this.context.passengersCount = parsed;
+    if (c.waitingForApproval) {
+      if (u.intent === 'approve') return this.onApproval(t0, voice);
+      if (u.intent === 'decline') {
+        c.waitingForApproval = false;
+        c.activeQuestion = 'options';
+        return this.reply('No problem, nothing has been booked. Want me to look at a cheaper option, a different time, or another date?', 'BOOKING_DECLINED', t0, voice);
       }
     }
 
-    // 5. MODE PREFERENCE EXTRACTION
-    if (lower.includes('flight') || lower.includes('plane') || lower.includes('hawai') || lower.includes('fly')) {
-      this.context.modePreference = 'flight';
-    } else if (lower.includes('train') || lower.includes('railway') || lower.includes('irctc')) {
-      this.context.modePreference = 'train';
-    } else if (lower.includes('bus') || lower.includes('sleeper bus')) {
-      this.context.modePreference = 'bus';
-    } else if (lower.includes('hotel') || lower.includes('resort')) {
-      this.context.modePreference = 'hotel';
-    } else if (lower.includes('all') || lower.includes('everything') || lower.includes('sab') || lower.includes('any')) {
-      this.context.modePreference = 'all';
+    if (u.intent === 'give_name' && u.slots.passengerName) {
+      c.passengerName = u.slots.passengerName;
+      return this.lockAndRequestPayment(t0, voice);
     }
 
-    // 6. CLASS PREFERENCES EXTRACTION
-    if (lower.includes('3ac') || lower.includes('3 ac') || lower.includes('third ac')) {
-      this.context.selectedClass = '3AC';
-      this.context.modePreference = 'train';
-    } else if (lower.includes('2ac') || lower.includes('2 ac') || lower.includes('second ac')) {
-      this.context.selectedClass = '2AC';
-      this.context.modePreference = 'train';
-    } else if (lower.includes('sleeper') && !lower.includes('bus')) {
-      this.context.selectedClass = 'Sleeper';
-      this.context.modePreference = 'train';
-    }
+    // Apply slots to the ledger (single source of truth) and mirror into UI context
+    const changed = this.applySlots(u);
 
-    // 7. CHECK INTERACTIVE QUESTIONS IF OPTIONS ARE PRESENTED
-    if (this.context.options.length > 0) {
-      if (lower.includes('cheaper') || lower.includes('sasta') || lower.includes('budget') || lower.includes('lowest price')) {
-        const cheapest = [...this.context.options].sort((a, b) => a.price - b.price)[0];
-        const resp = `The most affordable option is the ${cheapest.provider} ${cheapest.serviceNumber} at ₹${cheapest.price} (${cheapest.recommendationTag}). Would you like to proceed with this, or check flights?`;
-        this.context.selectedOption = cheapest;
-        this.speakAndRecord(resp, 'INTERACTIVE_CHEAPER_QUERY', startTime, voiceTrigger);
-        return;
+    if (c.options.length && !c.hold) {
+      if (u.intent === 'ask_cheaper') return this.pick('cheapest', t0, voice);
+      if (u.intent === 'ask_fastest') return this.pick('fastest', t0, voice);
+      if (u.intent === 'ask_morning') return this.pick('morning', t0, voice);
+      if (u.intent === 'select_option') return this.selectFromSpeech(u, t0, voice);
+      if (u.intent === 'shift_date' && c.dateISO) {
+        const d = fromISODate(c.dateISO);
+        d.setDate(d.getDate() + (u.dateShiftDays ?? 1));
+        contextHarness.setSlot('dateISO', toISODate(d), u.source);
+        this.syncFromLedger();
+        return this.search(t0, voice, `Moved to ${c.date}. `);
       }
-
-      if (lower.includes('morning') || lower.includes('subah')) {
-        const morningFlight = this.context.options.find((o) => o.mode === 'flight' && o.departureTime.includes('AM')) || this.context.options[0];
-        this.context.selectedOption = morningFlight;
-        const resp = `The morning IndiGo flight departs at 06:20 AM and arrives at 08:15 AM for ₹${morningFlight.price}. Includes 15 kg check-in baggage. Should I select this option?`;
-        this.speakAndRecord(resp, 'INTERACTIVE_MORNING_QUERY', startTime, voiceTrigger);
-        return;
-      }
-
-      if (lower.includes('fastest') || lower.includes('quickest') || lower.includes('speed')) {
-        const fastest = this.context.options.find((o) => o.mode === 'flight') || this.context.options[0];
-        this.context.selectedOption = fastest;
-        const resp = `The fastest option is the direct flight with IndiGo at 1h 55m for ₹${fastest.price}. Would you like to select this flight?`;
-        this.speakAndRecord(resp, 'INTERACTIVE_FASTEST_QUERY', startTime, voiceTrigger);
-        return;
-      }
-
-      if (lower.includes('one day later') || lower.includes('next day') || lower.includes('ek din baad')) {
-        this.context.date = 'Next Saturday';
-        const { options } = await travelEngine.searchTransportOptions(
-          this.context.origin || 'Mumbai',
-          this.context.destination,
-          'Next Saturday',
-          this.context.budget,
-          this.context.modePreference,
-          this.context.passengersCount || 1
-        );
-        this.context.options = options;
-        const resp = `Updated for Next Saturday! We have flights from ₹${options[0]?.price || 4800} and trains from ₹420. Which one works better for you?`;
-        this.speakAndRecord(resp, 'INTERACTIVE_DATE_SHIFT_QUERY', startTime, voiceTrigger);
-        return;
-      }
-
-      // User selects an option (Flight, Train 3AC, Bus, etc.)
-      const isSelectingFlight = lower.includes('flight') || lower.includes('indigo') || lower.includes('akasa') || lower.includes('option 1');
-      const isSelecting3AC = lower.includes('3ac') || lower.includes('train') || lower.includes('third ac') || lower.includes('option 2');
-      const isSelectingBus = lower.includes('bus') || lower.includes('sleeper bus') || lower.includes('option 3');
-
-      if (isSelectingFlight || isSelecting3AC || isSelectingBus || lower.includes('select') || lower.includes('choose')) {
-        let chosen = this.context.options[0];
-        if (isSelecting3AC) {
-          chosen = this.context.options.find((o) => o.mode === 'train') || this.context.options[0];
-        } else if (isSelectingBus) {
-          chosen = this.context.options.find((o) => o.mode === 'bus') || this.context.options[0];
-        } else if (isSelectingFlight) {
-          chosen = this.context.options.find((o) => o.mode === 'flight') || this.context.options[0];
-        }
-
-        this.context.selectedOption = chosen;
-        this.context.step = 'option_selected';
-        this.context.waitingForApproval = true;
-        this.context.activeQuestion = 'approval';
-        this.onStateChange({ ...this.context });
-
-        const pCount = this.context.passengersCount || 1;
-        const resp = `Selected ${chosen.provider} (${chosen.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Delhi'} to ${this.context.destination} on ${this.context.date || 'your selected date'}. Total fare is ₹${chosen.price}. Would you like me to proceed with this booking?`;
-        this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', startTime, voiceTrigger);
-        return;
+      // Trip details changed after options were shown -> search again
+      if (changed.some((k) => ['destination', 'origin', 'dateISO', 'passengers', 'mode', 'travelClass'].includes(k))) {
+        if (contextHarness.missingRequired().length === 0) return this.search(t0, voice, 'Updated. ');
       }
     }
 
-    // 8. ONE QUESTION AT A TIME (Polite, Human, Sequential)
-    // Step 1: Destination
-    if (!this.context.destination) {
-      this.context.activeQuestion = 'destination';
-      const resp = "Hello! Welcome. Where would you like to travel today?";
-      this.speakAndRecord(resp, 'STEP_1_ASK_DESTINATION', startTime, voiceTrigger);
-      return;
+    if (u.intent === 'other' && u.reply) {
+      return this.reply(u.reply, 'SMALL_TALK', t0, voice);
     }
 
-    // Step 2: Origin
-    if (!this.context.origin) {
-      this.context.activeQuestion = 'origin';
-      const resp = `Where will you be travelling from to reach ${this.context.destination}?`;
-      this.speakAndRecord(resp, 'STEP_2_ASK_ORIGIN', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 3: Travel Date
-    if (!this.context.date) {
-      this.context.activeQuestion = 'date';
-      const resp = `When would you like to travel to ${this.context.destination}?`;
-      this.speakAndRecord(resp, 'STEP_3_ASK_DATE', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 4: Return Journey
-    if (!this.context.tripType) {
-      this.context.activeQuestion = 'tripType';
-      const resp = `Got it, ${this.context.date}! Would you like a one-way trip or a return journey?`;
-      this.speakAndRecord(resp, 'STEP_4_ASK_RETURN', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 5: Number of Travellers
-    if (!this.context.passengersCount) {
-      this.context.activeQuestion = 'passengers';
-      const resp = "How many people will be travelling?";
-      this.speakAndRecord(resp, 'STEP_5_ASK_PASSENGER_COUNT', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 6: Mode of Transport
-    if (!this.context.modePreference) {
-      this.context.activeQuestion = 'mode';
-      const resp = "How would you prefer to travel? By flight, train or bus?";
-      this.speakAndRecord(resp, 'STEP_6_ASK_MODE', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 7: Preferences (optional)
-    if (!this.context.preferencesAsked) {
-      this.context.preferencesAsked = true;
-      this.context.activeQuestion = 'preferences';
-      const resp = "Do you have any particular preferences, such as a morning departure, direct flight or a specific train/bus class?";
-      this.speakAndRecord(resp, 'STEP_7_ASK_PREFERENCES', startTime, voiceTrigger);
-      return;
-    }
-
-    // Step 8: FETCH & PRESENT GROUNDED OPTIONS FOR THIS EXACT ROUTE
-    this.context.step = 'discovering';
-    this.context.activeQuestion = 'options';
-    this.onStateChange({ ...this.context });
-
-    const pCount = this.context.passengersCount || 1;
-    const { options, searchLatencyMs } = await travelEngine.searchTransportOptions(
-      this.context.origin,
-      this.context.destination,
-      this.context.date,
-      this.context.budget,
-      this.context.modePreference,
-      pCount
-    );
-
-    this.context.options = options;
-    this.context.selectedOption = options[0];
-    this.context.step = 'options_presented';
-    this.onStateChange({ ...this.context });
-
-    const resp = `Here are the available options for ${this.context.origin} to ${this.context.destination} on ${this.context.date} for ${pCount} traveller(s). Would you like to explore one of these, or should I look for alternatives?`;
-
-    this.speakAndRecord(
-      resp,
-      'STEP_8_OPTIONS_PRESENTED',
-      startTime,
-      voiceTrigger,
-      {
-        name: 'search_transport_options',
-        params: {
-          origin: this.context.origin,
-          destination: this.context.destination,
-          date: this.context.date,
-          mode: this.context.modePreference,
-          passengers: pCount,
-        },
-        resultSummary: `Found ${options.length} verified options for ${this.context.origin} ➔ ${this.context.destination}`,
-        durationMs: searchLatencyMs,
-      }
-    );
+    return this.askNextOrSearch(changed, t0, voice);
   }
 
-  // --- STRICT CUSTOMER APPROVAL FIRST: LOCK SEAT & PUSH PAYMENT ---
-  private async handleExecuteSeatLockAndUpiPush(
-    passengerName: string,
-    startTime: number,
-    voiceTrigger: boolean
-  ) {
-    const option = this.context.selectedOption || this.context.options[0];
-    if (!option) return;
+  private applySlots(u: Understanding): SlotKey[] {
+    const s = { ...u.slots };
+    delete s.passengerName;
+    if (s.passengers !== undefined && (s.passengers < 1 || s.passengers > 9)) delete s.passengers;
+    const changed = contextHarness.applySlots(s, u.source);
+    this.syncFromLedger();
+    return changed;
+  }
 
-    const upiHandle = `${passengerName.toLowerCase().replace(/\s+/g, '')}@okhdfcbank`;
+  private syncFromLedger() {
+    const c = this.context;
+    const prevDest = c.destination;
+    c.destination = contextHarness.getSlot<string>('destination') ?? '';
+    c.origin = contextHarness.getSlot<string>('origin') ?? '';
+    c.dateISO = contextHarness.getSlot<string>('dateISO') ?? null;
+    c.date = c.dateISO ? formatDisplayDate(c.dateISO) : '';
+    c.passengersCount = contextHarness.getSlot<number>('passengers') ?? 0;
+    c.modePreference = (contextHarness.getSlot<string>('mode') as AgentContext['modePreference']) ?? null;
+    c.selectedClass = contextHarness.getSlot<string>('travelClass') ?? null;
+    c.timePreference = contextHarness.getSlot<string>('timePreference') ?? null;
+    c.budget = contextHarness.getSlot<number>('budget') ?? null;
+    if (prevDest && c.destination !== prevDest && !c.hold) {
+      c.options = [];
+      c.selectedOption = null;
+      c.waitingForApproval = false;
+    }
+  }
+
+  private async askNextOrSearch(changed: SlotKey[], t0: number, voice: boolean) {
+    const c = this.context;
+    const missing = contextHarness.missingRequired();
+    if (missing.length === 0) {
+      analytics.track('trip_details_complete');
+      return this.search(t0, voice);
+    }
+    const q = SLOT_TO_QUESTION[missing[0]];
+    c.activeQuestion = q;
+    // Acknowledge what we captured this turn, so the user knows they were heard
+    const acks: string[] = [];
+    if (changed.includes('origin') && changed.includes('destination')) acks.push(`${c.origin} to ${c.destination}`);
+    else if (changed.includes('destination')) acks.push(c.destination);
+    else if (changed.includes('origin')) acks.push(`from ${c.origin}`);
+    if (changed.includes('dateISO')) acks.push(c.date);
+    if (changed.includes('passengers')) acks.push(`${c.passengersCount} traveller${c.passengersCount > 1 ? 's' : ''}`);
+    const prefix = acks.length ? `Got it, ${acks.join(', ')}. ` : '';
+    return this.reply(prefix + QUESTIONS[q](c), `ASK_${q.toUpperCase()}`, t0, voice);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tools
+  // ---------------------------------------------------------------------------
+  private async search(t0: number, voice: boolean, prefix = '') {
+    const c = this.context;
+    // A cancelled / refunded booking is history: start a fresh search on the same trip details
+    if (c.hold && (c.hold.status === 'cancelled' || c.hold.status === 'refunded')) {
+      c.hold = null;
+      c.transaction = null;
+      c.refund = null;
+      c.refundQuote = null;
+      c.auditTrail = [];
+    }
+    c.step = 'discovering';
+    this.emit();
+    const tTool = performance.now();
+    const { options } = await travelEngine.searchTransportOptions(
+      c.origin,
+      c.destination,
+      c.date,
+      c.budget,
+      c.modePreference ?? 'all',
+      c.passengersCount || 1
+    );
+    const toolMs = performance.now() - tTool;
+    analytics.timing('tool_ms', toolMs);
+
+    let ranked = options;
+    if (c.selectedClass) {
+      const cls = c.selectedClass.toLowerCase();
+      ranked = [...options].sort((a, b) => Number(b.serviceNumber.toLowerCase().includes(cls) || b.recommendationTag?.toLowerCase().includes(cls)) - Number(a.serviceNumber.toLowerCase().includes(cls) || a.recommendationTag?.toLowerCase().includes(cls)));
+    }
+    if (c.timePreference === 'morning') ranked = [...ranked].sort((a, b) => Number(departureHour(b.departureTime) < 12) - Number(departureHour(a.departureTime) < 12));
+
+    c.options = ranked;
+    c.selectedOption = null;
+    c.step = 'options_presented';
+    c.activeQuestion = 'options';
+    contextHarness.recordOptions(ranked);
+    analytics.track('options_shown', { count: ranked.length });
+
+    if (!ranked.length) {
+      return this.reply(`${prefix}I couldn't find options for that. Want me to try another mode or date?`, 'NO_OPTIONS', t0, voice);
+    }
+    const cheapest = [...ranked].sort((a, b) => a.price - b.price)[0];
+    const fastest = [...ranked].filter((o) => o.mode !== 'hotel').sort((a, b) => durationMinutes(a.duration) - durationMinutes(b.duration))[0];
+    const pax = c.passengersCount || 1;
+    const parts = [`${prefix}I found ${ranked.length} options from ${c.origin} to ${c.destination} on ${c.date} for ${pax} traveller${pax > 1 ? 's' : ''}.`];
+    if (fastest) parts.push(`Fastest is ${label(fastest)} at ${fastest.duration.split(' (')[0]} for ${inr(fastest.price)}.`);
+    if (cheapest && cheapest.id !== fastest?.id) parts.push(`Cheapest is ${label(cheapest)} for ${inr(cheapest.price)}.`);
+    parts.push('Which one should I book?');
+    return this.reply(parts.join(' '), 'OPTIONS_PRESENTED', t0, voice, {
+      name: 'search_transport_options',
+      params: { origin: c.origin, destination: c.destination, date: c.dateISO, mode: c.modePreference ?? 'all', passengers: pax },
+      resultSummary: `${ranked.length} options (sandbox inventory)`,
+      durationMs: Math.round(toolMs),
+    });
+  }
+
+  private pick(kind: 'cheapest' | 'fastest' | 'morning', t0: number, voice: boolean) {
+    const c = this.context;
+    const travel = c.options.filter((o) => o.mode !== 'hotel');
+    let chosen: TravelOption | undefined;
+    if (kind === 'cheapest') chosen = [...travel].sort((a, b) => a.price - b.price)[0];
+    if (kind === 'fastest') chosen = [...travel].sort((a, b) => durationMinutes(a.duration) - durationMinutes(b.duration))[0];
+    if (kind === 'morning') chosen = [...travel].filter((o) => departureHour(o.departureTime) < 12).sort((a, b) => departureHour(a.departureTime) - departureHour(b.departureTime))[0];
+    if (!chosen) return this.reply(`I don't see a ${kind} option on this route. Want me to change the date or mode?`, `PICK_${kind.toUpperCase()}_NONE`, t0, voice);
+    return this.proposeSelection(chosen, `The ${kind} option is`, t0, voice);
+  }
+
+  private selectFromSpeech(u: Understanding, t0: number, voice: boolean) {
+    const c = this.context;
+    let chosen: TravelOption | undefined;
+    const pool = u.selection?.mode ? c.options.filter((o) => o.mode === u.selection!.mode) : c.options;
+    if (u.selection?.index) chosen = pool[u.selection.index - 1];
+    if (!chosen && c.selectedClass) chosen = pool.find((o) => `${o.serviceNumber} ${o.recommendationTag}`.toLowerCase().includes(c.selectedClass!.toLowerCase()));
+    if (!chosen) chosen = pool[0];
+    if (!chosen) return this.reply("Sorry, I couldn't match that to an option on screen. You can say 'option 2' or 'the train'.", 'SELECT_UNMATCHED', t0, voice);
+    return this.proposeSelection(chosen, 'You picked', t0, voice);
+  }
+
+  /** Called from UI click as well as voice. */
+  handleSelectOptionExplicitly(opt: TravelOption) {
+    this.proposeSelection(opt, 'You picked', performance.now(), true);
+  }
+
+  private proposeSelection(opt: TravelOption, lead: string, t0: number, voice: boolean) {
+    const c = this.context;
+    c.selectedOption = opt;
+    c.step = 'option_selected';
+    c.waitingForApproval = true;
+    c.activeQuestion = 'approval';
+    analytics.track('option_selected', { mode: opt.mode, price: opt.price });
+    const pax = c.passengersCount || 1;
+    const text =
+      `${lead} ${label(opt)}, departing ${opt.departureTime}, ${opt.duration.split(' (')[0]}. ` +
+      `Total for ${pax} traveller${pax > 1 ? 's' : ''} is ${inr(opt.price)}, one-way on ${c.date}. ` +
+      `Cancellation: ${opt.cancellation.refundSummary.toLowerCase()}. Shall I book it?`;
+    this.reply(text, 'SOLICIT_EXPLICIT_APPROVAL', t0, voice);
+  }
+
+  private onApproval(t0: number, voice: boolean) {
+    const c = this.context;
+    analytics.track('booking_approved');
+    c.waitingForApproval = false;
+    // A failed payment on a still-valid hold is retried on the SAME order (idempotent), not re-booked
+    if (c.hold && c.hold.status === 'held' && c.transaction?.status === 'FAILED') {
+      return this.retryPayment(voice);
+    }
+    if (!c.passengerName) {
+      c.activeQuestion = 'name';
+      return this.reply("Great. What is the lead passenger's full name, as on their ID?", 'ASK_PASSENGER_NAME', t0, voice);
+    }
+    return this.lockAndRequestPayment(t0, voice);
+  }
+
+  private async lockAndRequestPayment(t0: number, voice: boolean) {
+    const c = this.context;
+    const option = c.selectedOption;
+    if (!option) return this.askNextOrSearch([], t0, voice);
+    const handle = `${c.passengerName.toLowerCase().replace(/[^a-z]/g, '') || 'traveller'}@paytm`;
     const passenger: PassengerDetails = {
       id: `usr-${Date.now()}`,
-      name: passengerName,
-      phone: '+91 98450 12345',
-      email: `${passengerName.toLowerCase().replace(/\s+/g, '')}@example.com`,
-      upiId: upiHandle,
-      seatPreference:
-        option.mode === 'train'
-          ? 'Berth 28 (Lower Berth, 3AC)'
-          : option.mode === 'bus'
-          ? 'Single Sleeper Berth U4'
-          : '12F (Window Seat)',
+      name: c.passengerName,
+      phone: '+91 9XXXX XXXXX',
+      email: 'traveller@example.com',
+      upiId: handle,
+      seatPreference: option.mode === 'train' ? 'Lower berth (preference)' : option.mode === 'bus' ? 'Single sleeper (preference)' : 'Window (preference)',
     };
-
-    this.context.step = 'seat_locked';
-    const hold = await travelEngine.lockFareAndHoldPNR(option.id, passenger);
-    this.context.hold = hold;
-    this.onStateChange({ ...this.context });
-
-    // Initiate out-of-band UPI push
-    const txn = await paymentEngine.initiateUpiPush(hold.orderId, hold.amount, upiHandle);
-    this.context.transaction = txn;
-    this.context.step = 'payment_pushed';
-    this.context.waitingForApproval = false;
-
-    const resp = `I've placed a 10-minute hold for ${passengerName} at ₹${hold.amount}. I sent an instant UPI payment request to your UPI ID (${upiHandle}). Please open Google Pay or PhonePe to approve the payment.`;
-
-    this.speakAndRecord(
-      resp,
-      'PAYMENT_PUSH_INITIATED',
-      startTime,
-      voiceTrigger,
+    c.step = 'seat_locked';
+    this.emit();
+    const tTool = performance.now();
+    const hold = await travelEngine.lockFareAndHoldPNR(option.id, passenger, c.passengersCount || 1, c.dateISO);
+    const txn = await paymentEngine.requestPayment(hold.orderId, hold.amount, handle);
+    analytics.timing('tool_ms', performance.now() - tTool);
+    c.hold = hold;
+    c.transaction = txn;
+    c.step = 'payment_pushed';
+    c.activeQuestion = 'none';
+    contextHarness.recordHold(hold);
+    contextHarness.recordPayment(txn);
+    analytics.track('payment_requested', { amount: hold.amount });
+    return this.reply(
+      `Done. Your fare is held for 10 minutes at ${inr(hold.amount)}. Please approve the payment on the Paytm UPI screen. You'll enter your PIN there, never with me.`,
+      'PAYMENT_REQUESTED',
+      t0,
+      voice,
       {
-        name: 'lock_fare_and_hold_pnr',
-        params: { orderId: hold.orderId, amount: hold.amount, passenger: passengerName, upiVpa: upiHandle },
-        resultSummary: `10m hold active for ${passengerName}. Push sent to ${upiHandle}`,
-        durationMs: 310,
+        name: 'lock_fare_and_request_upi',
+        params: { orderId: hold.orderId, amount: hold.amount, method: 'PAYTM_UPI_INTENT' },
+        resultSummary: `Hold ${hold.orderId} active for 10 min`,
+        durationMs: Math.round(performance.now() - tTool),
       }
     );
   }
 
-  // --- SIMULATED USER UPI APPROVAL ---
-  public async handleSimulatedPaymentApproval() {
-    if (!this.context.transaction || !this.context.hold) return;
-
-    this.context.step = 'payment_verifying';
-    this.onStateChange({ ...this.context });
-
-    const pnr = this.context.hold.pnr || `PNR-${Math.floor(1000 + Math.random() * 9000)}`;
-    const passengerName = this.context.passengerName || 'Traveler';
-
-    await new Promise((r) => setTimeout(r, 600));
-    this.context.transaction.status = 'CAPTURED';
-    this.context.step = 'confirmed';
-    this.context.hold.status = 'paid';
-
-    const resp = `Payment received! Your ${this.context.selectedOption?.mode || 'ticket'} is confirmed for ${passengerName}. Your PNR is ${pnr}. E-ticket has been sent to your WhatsApp. Have a wonderful journey!`;
-
-    this.speakAndRecord(
-      resp,
-      'PAYMENT_CAPTURED_AND_TICKET_CONFIRMED',
+  // ---------------------------------------------------------------------------
+  // Payment outcomes (triggered from the sandbox UPI sheet)
+  // ---------------------------------------------------------------------------
+  async handleSimulatedPaymentApproval() {
+    const c = this.context;
+    if (!c.transaction || !c.hold) return;
+    c.step = 'payment_verifying';
+    this.emit();
+    const txn = await paymentEngine.approve(c.transaction.transactionId);
+    travelEngine.confirmHold(c.hold.orderId);
+    c.transaction = { ...txn };
+    c.hold = { ...c.hold, status: 'paid' };
+    c.step = 'confirmed';
+    contextHarness.recordHold(c.hold);
+    contextHarness.recordPayment(txn);
+    analytics.track('booking_confirmed', { amount: c.hold.amount, mode: c.hold.selectedOption.mode });
+    this.reply(
+      `Payment received. Your booking is confirmed, PNR ${c.hold.pnr}. The e-ticket is in My Trips. Have a great journey, ${c.passengerName}!`,
+      'BOOKING_CONFIRMED',
       performance.now(),
       true,
-      {
-        name: 'verify_and_issue_ticket',
-        params: { orderId: this.context.hold.orderId, pnr, passenger: passengerName },
-        resultSummary: `Ticket confirmed: PNR ${pnr} issued for ${passengerName}`,
-        durationMs: 380,
-      }
+      { name: 'issue_ticket', params: { orderId: c.hold.orderId }, resultSummary: `PNR ${c.hold.pnr}`, durationMs: 500 }
     );
   }
 
-  // --- EXCEPTION: MONEY DEDUCTED / TICKET PENDING ---
-  public async handlePaymentDeductedException(startTime: number = performance.now(), voiceTrigger: boolean = true) {
-    this.context.step = 'payment_exception_recovery';
-    this.onStateChange({ ...this.context });
-
-    const audit = await paymentEngine.reconcileMoneyDeductedTicketPending(
-      this.context.hold?.orderId || 'ORD-VOY-554109'
+  async paymentFailed(reason: UpiFailureReason, voice = true) {
+    const c = this.context;
+    if (!c.transaction || !c.hold) return;
+    const txn = await paymentEngine.fail(c.transaction.transactionId, reason);
+    c.transaction = { ...txn };
+    analytics.track('payment_failed', { reason });
+    const minsLeft = Math.max(0, Math.round((c.hold.holdExpiresAt - Date.now()) / 60000));
+    c.step = 'option_selected';
+    c.waitingForApproval = true;
+    c.activeQuestion = 'approval';
+    this.reply(
+      `The payment didn't go through because ${FAILURE_COPY[reason]}. No money was taken. Your fare is still held for about ${minsLeft} minutes. Shall I send the payment request again?`,
+      `PAYMENT_FAILED_${reason}`,
+      performance.now(),
+      voice
     );
+  }
 
-    const passengerName = this.context.passengerName || 'Traveler';
-    this.context.step = 'confirmed';
-    if (this.context.hold) {
-      this.context.hold.pnr = audit.pnr;
-      this.context.hold.status = 'reconciled';
+  /** Retry keeps the same order id (idempotency key) so a double tap can never double-charge. */
+  async retryPayment(voice = true) {
+    const c = this.context;
+    if (!c.hold) return;
+    analytics.track('payment_retry');
+    const txn = await paymentEngine.requestPayment(c.hold.orderId, c.hold.amount, c.hold.passenger.upiId);
+    c.transaction = txn;
+    c.step = 'payment_pushed';
+    c.waitingForApproval = false;
+    c.activeQuestion = 'none';
+    contextHarness.recordPayment(txn);
+    this.reply(`Sent again for ${inr(c.hold.amount)}, same order, so you can't be charged twice. Please approve it in Paytm UPI.`, 'PAYMENT_RETRY', performance.now(), voice);
+  }
+
+  async simulateDebitedButPending(soldOut: boolean) {
+    const c = this.context;
+    if (!c.transaction || !c.hold) return;
+    const txn = await paymentEngine.markDebitedButPending(c.transaction.transactionId);
+    c.transaction = { ...txn };
+    if (soldOut) {
+      // Hold lapsed and the seat was sold meanwhile: the worst case
+      c.hold = { ...c.hold, holdExpiresAt: Date.now() - 1000 };
+      travelEngine.markSoldOut(c.hold.selectedOption.id);
     }
-
-    const resp = `Don't worry, ${passengerName}! I ran an instant 3-way check across our payment gateway, bank ledger, and reservation system. Your payment was captured and your ticket is confirmed! Your PNR is ${audit.pnr}. Have a safe journey!`;
-
-    this.speakAndRecord(
-      resp,
-      '3_WAY_RECONCILIATION_RESOLVED',
-      startTime,
-      voiceTrigger,
-      {
-        name: 'reconcile_and_issue_pnr',
-        params: { auditStatus: audit.resolvedStatus, pnr: audit.pnr },
-        resultSummary: `3-Way match verified. PNR ${audit.pnr} confirmed`,
-        durationMs: 440,
-      }
-    );
+    this.system(soldOut ? 'Sandbox: bank debited, callback lost, hold expired and seat sold out' : 'Sandbox: bank debited, callback lost (ticket pending)');
+    this.emit();
   }
 
-  // --- PUBLIC OPTION SELECTION (From UI Click) ---
-  public handleSelectOptionExplicitly(opt: TravelOption) {
-    this.context.selectedOption = opt;
-    this.context.step = 'option_selected';
-    this.context.waitingForApproval = true;
-    this.context.activeQuestion = 'approval';
-    this.onStateChange({ ...this.context });
+  private async reconcile(t0: number, voice: boolean) {
+    const c = this.context;
+    c.step = 'payment_exception_recovery';
+    this.emit();
+    analytics.track('reconciliation_run');
+    const inventory = c.hold ? travelEngine.isInventoryAvailable(c.hold.selectedOption.id) : false;
+    const tTool = performance.now();
+    const res = await paymentEngine.reconcile(c.hold, c.transaction, { inventoryAvailable: inventory });
+    c.auditTrail = res.auditTrail;
+    const tool = { name: 'reconcile_3_way', params: { orderId: c.hold?.orderId ?? null }, resultSummary: res.outcome, durationMs: Math.round(performance.now() - tTool) };
 
-    const pCount = this.context.passengersCount || 1;
-    const resp = `Selected ${opt.provider} (${opt.serviceNumber}) for ${pCount} traveller(s) from ${this.context.origin || 'Delhi'} to ${this.context.destination || 'Jodhpur'} on ${this.context.date || 'your travel date'}. Total fare is ₹${opt.price}. Would you like me to proceed with this booking?`;
-    this.speakAndRecord(resp, 'SOLICIT_EXPLICIT_BOOKING_APPROVAL', performance.now(), true);
-  }
-
-  // --- BAGGAGE AND CANCELLATION ---
-  private async handleBaggageAndCancellationQuery(startTime: number, voiceTrigger: boolean) {
-    const opt = this.context.selectedOption || this.context.options[0];
-    let resp = "For flights, 15 kg check-in baggage and 7 kg cabin baggage are included. Cancellations are refundable with standard airline fee.";
-    if (opt?.mode === 'train') {
-      resp = `For ${opt.serviceNumber}, IRCTC allows 40 kg free luggage. Cancellations are fully refundable minus standard IRCTC clerkage.`;
-    } else if (opt?.mode === 'bus') {
-      resp = `For ${opt.provider}, 20 kg luggage is stored in the compartment. Full refund is available up to 12 hours prior to departure.`;
+    if (res.outcome === 'TICKET_ISSUED' && c.hold) {
+      c.hold = { ...c.hold, status: 'reconciled' };
+      c.transaction = c.transaction ? { ...c.transaction, status: 'RECONCILED' } : null;
+      c.step = 'confirmed';
+      contextHarness.recordHold(c.hold);
+      analytics.track('booking_confirmed', { amount: c.hold.amount, via: 'reconciliation' });
+      return this.reply(`I checked the bank, our ledger and the ${c.hold.selectedOption.mode} operator. Your payment did reach us, and your ticket is now issued. PNR ${c.hold.pnr}. Sorry for the scare.`, 'RECONCILED_TICKET_ISSUED', t0, voice, tool);
     }
-
-    this.speakAndRecord(resp, 'BAGGAGE_AND_CANCELLATION_RESOLVED', startTime, voiceTrigger);
+    if (res.outcome === 'AUTO_REFUND' && res.refund && c.hold) {
+      c.refund = res.refund;
+      c.hold = { ...c.hold, status: 'refunded' };
+      c.transaction = c.transaction ? { ...c.transaction, status: 'REFUNDED' } : null;
+      c.step = 'cancelled';
+      contextHarness.recordRefund(res.refund.refundId, res.refund.refundAmount, 0, c.hold.orderId);
+      analytics.track('refund_initiated', { amount: res.refund.refundAmount, reason: 'booking_failed_after_debit' });
+      return this.reply(`Your bank did debit ${inr(res.refund.refundAmount)}, but the seat sold out before the ticket could be issued. I've started a full refund, ${res.refund.refundId}, with no fees. Want me to find you another option?`, 'RECONCILED_AUTO_REFUND', t0, voice, tool);
+    }
+    if (res.outcome === 'NO_DEBIT_FOUND') {
+      c.step = c.hold ? 'option_selected' : 'idle';
+      return this.reply("I checked with the bank and no money was debited for this booking, so there's nothing stuck. If your bank app shows a debit, it's usually a temporary hold that reverses on its own. Want me to retry the payment?", 'RECONCILED_NO_DEBIT', t0, voice, tool);
+    }
+    c.step = 'idle';
+    return this.reply("I can't find a booking from you in the last 24 hours. If you paid on another device, share the order ID from your bank SMS and I'll trace it.", 'RECONCILED_NO_ORDER', t0, voice, tool);
   }
 
-  private speakAndRecord(
-    text: string,
-    intent: string,
-    startTime: number,
-    voiceTrigger: boolean,
-    toolCall?: Message['toolCall']
-  ) {
-    const latency = Math.round(performance.now() - startTime);
-    this.appendMessage({
-      id: `agent-${Date.now()}`,
+  // ---------------------------------------------------------------------------
+  // Cancellation & policy
+  // ---------------------------------------------------------------------------
+  private quoteCancellation(t0: number, voice: boolean) {
+    const c = this.context;
+    if (!c.hold || !(c.hold.status === 'paid' || c.hold.status === 'reconciled')) {
+      return this.reply("You don't have a confirmed booking with me in this session to cancel.", 'CANCEL_NO_BOOKING', t0, voice);
+    }
+    const q = quoteRefund(c.hold);
+    c.refundQuote = q;
+    c.step = 'cancellation_quoted';
+    c.activeQuestion = 'cancel_confirm';
+    contextHarness.recordRefund(`QUOTE-${q.orderId}`, q.refundAmount, q.cancellationFee, q.orderId);
+    const fees = [`cancellation fee ${inr(q.cancellationFee)}`];
+    if (q.nonRefundableConvenienceFee) fees.push(`convenience fee ${inr(q.nonRefundableConvenienceFee)}`);
+    const text = q.refundAmount > 0
+      ? `If you cancel now, you'll get back ${inr(q.refundAmount)} out of ${inr(q.paidAmount)}, after ${fees.join(' and ')}. Do you want to cancel?`
+      : `This booking isn't refundable any more (${q.rule.toLowerCase()}). Cancelling now would refund nothing. Do you still want to cancel?`;
+    return this.reply(text, 'CANCELLATION_QUOTED', t0, voice);
+  }
+
+  private async confirmCancellation(t0: number, voice: boolean) {
+    const c = this.context;
+    if (!c.hold || !c.refundQuote) return;
+    const refund = await paymentEngine.refund(c.hold, c.transaction, c.refundQuote);
+    c.refund = refund;
+    c.hold = { ...c.hold, status: 'cancelled' };
+    c.step = 'cancelled';
+    c.activeQuestion = 'none';
+    contextHarness.recordRefund(refund.refundId, refund.refundAmount, refund.cancellationFee, c.hold.orderId);
+    analytics.track('cancellation_completed', { refund: refund.refundAmount });
+    if (refund.refundAmount > 0) analytics.track('refund_initiated', { amount: refund.refundAmount, reason: 'customer_cancellation' });
+    return this.reply(`Cancelled. Refund ${refund.refundId} of ${inr(refund.refundAmount)} is on its way ${refund.eta}.`, 'CANCELLATION_DONE', t0, voice, {
+      name: 'cancel_and_refund',
+      params: { orderId: c.hold.orderId },
+      resultSummary: `${refund.refundId}: ${inr(refund.refundAmount)}`,
+      durationMs: 400,
+    });
+  }
+
+  private policyAnswer(intent: 'ask_baggage' | 'ask_cancellation_policy', t0: number, voice: boolean) {
+    const c = this.context;
+    const opt = c.selectedOption ?? c.hold?.selectedOption ?? null;
+    if (!opt) {
+      return this.reply('Pick an option first and I will read out its exact baggage and cancellation rules.', 'POLICY_NEEDS_OPTION', t0, voice);
+    }
+    const text = intent === 'ask_baggage'
+      ? `${opt.provider} ${opt.serviceNumber}: cabin ${opt.baggage.cabin.toLowerCase()}, check-in ${opt.baggage.checkIn.toLowerCase()}.`
+      : `${opt.provider} ${opt.serviceNumber}: ${opt.cancellation.refundSummary}. Fee is ${inr(opt.cancellation.feeBefore24h)} per traveller more than 24 hours before departure, ${inr(opt.cancellation.feeWithin24h)} within 24 hours. The ${inr(opt.convenienceFee)} convenience fee isn't refundable.`;
+    return this.reply(text, intent === 'ask_baggage' ? 'BAGGAGE_POLICY' : 'CANCELLATION_POLICY', t0, voice, {
+      name: 'get_fare_rules',
+      params: { optionId: opt.id },
+      resultSummary: 'Rules read from fare data',
+      durationMs: 0,
+    });
+  }
+
+  private bookingStatus(t0: number, voice: boolean) {
+    const h = this.context.hold;
+    if (!h) return this.reply('You have no bookings in this session yet. Where would you like to go?', 'STATUS_NONE', t0, voice);
+    const label: Record<BookingHold['status'], string> = {
+      held: 'on hold, waiting for payment',
+      paid: 'confirmed',
+      reconciled: 'confirmed',
+      expired: 'expired',
+      released: 'released',
+      cancelled: 'cancelled',
+      refunded: 'refunded',
+    };
+    return this.reply(`Your ${h.selectedOption.provider} booking ${h.orderId} is ${label[h.status]}${h.status === 'paid' || h.status === 'reconciled' ? `, PNR ${h.pnr}` : ''}.`, 'BOOKING_STATUS', t0, voice);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Output: grounding validator + TTS
+  // ---------------------------------------------------------------------------
+  private reply(text: string, intent: string, t0: number, voice: boolean, toolCall?: Message['toolCall']) {
+    const check = contextHarness.validateReply(text);
+    let spoken = text;
+    if (!check.ok) {
+      analytics.track('ungrounded_claim_blocked', { intent, claims: check.ungrounded.join(' ') });
+      this.system(`Grounding guard blocked an unverified claim: ${check.ungrounded.join(', ')}`);
+      spoken = "Let me double-check that before I tell you a number. Could you say that again, or pick an option on screen?";
+    }
+    this.append({
+      id: `agent-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`,
       role: 'agent',
-      text,
+      text: spoken,
       timestamp: new Date().toLocaleTimeString(),
       intentDetected: intent,
-      latencyMs: latency,
+      latencyMs: Math.round(performance.now() - t0),
       toolCall,
     });
-    if (voiceTrigger) speechService.speak(text);
+    if (voice) speechService.speak(spoken);
+  }
+
+  private system(text: string) {
+    this.append({ id: `sys-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`, role: 'system', text, timestamp: new Date().toLocaleTimeString() });
+  }
+
+  private append(m: Message) {
+    this.context.messages = [...this.context.messages, m];
+    this.emit();
   }
 }

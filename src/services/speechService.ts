@@ -4,7 +4,11 @@ interface IWindow extends Window {
   SpeechRecognition?: any;
 }
 
-const SARVAM_KEY = import.meta.env.VITE_SARVAM_API_KEY || '';
+import { backendTts } from './agentApi';
+import { analytics } from './analytics';
+
+/** Language used for both STT (Web Speech) and TTS (Sarvam). Set from the dialect picker. */
+export type VoiceLanguage = 'en-IN' | 'hi-IN';
 
 class SpeechService {
   private recognition: any = null;
@@ -13,6 +17,11 @@ class SpeechService {
   private currentAudioElement: HTMLAudioElement | null = null;
   private indianVoice: SpeechSynthesisVoice | null = null;
   private isAudioPlaying: boolean = false;
+  private language: VoiceLanguage = 'en-IN';
+
+  public setLanguage(lang: VoiceLanguage) {
+    this.language = lang;
+  }
 
   constructor() {
     this.initSpeechSynthesis();
@@ -56,7 +65,7 @@ class SpeechService {
       this.recognition = new SpeechRec();
       this.recognition.continuous = true;
       this.recognition.interimResults = true;
-      this.recognition.lang = 'en-IN'; // Indian English
+      this.recognition.lang = this.language; // en-IN or hi-IN (Hinglish works best with hi-IN)
 
       this.recognition.onstart = () => {
         this.isListeningActive = true;
@@ -124,10 +133,8 @@ class SpeechService {
       .replace(/\*\*/g, '')
       .replace(/₹/g, 'Rupees ')
       .replace(/•/g, ', ')
-      .replace(/6E-512/g, '6 E 5 1 2')
-      .replace(/6E-W8/g, '6 E W 8')
-      .replace(/BLR/g, 'Bangalore')
-      .replace(/GOI|GOX/g, 'Goa');
+      // Spell out PNR / flight codes so TTS reads them character by character
+      .replace(/([A-Z0-9]{2})-([A-Z0-9]{3,4})/g, (_m, a, b) => `${a.split('').join(' ')} ${b.split('').join(' ')}`);
 
     // 1. Try Sarvam AI Bulbul TTS (Neural Indian Voice)
     const sarvamAudioBase64 = await this.fetchSarvamTTS(cleaned);
@@ -164,38 +171,12 @@ class SpeechService {
     this.fallbackBrowserTTS(cleaned, onStart, onEnd, onError);
   }
 
+  // Sarvam Bulbul TTS via our backend proxy (key stays server-side). Measures time-to-audio.
   private async fetchSarvamTTS(text: string): Promise<string | null> {
-    const key = SARVAM_KEY || 'sk_hr9t8fog_J8xJjph9TpWp80w9zIuLd94y';
-    if (!key) return null;
-
-    try {
-      const response = await fetch('https://api.sarvam.ai/text-to-speech', {
-        method: 'POST',
-        headers: {
-          'api-subscription-key': key,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          inputs: [text.slice(0, 480)],
-          target_language_code: 'en-IN',
-          speaker: 'kavya',
-          model: 'bulbul:v3',
-          pace: 1.02,
-          speech_sample_rate: 22050,
-          enable_preprocessing: true,
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.audios && data.audios.length > 0) {
-          return data.audios[0];
-        }
-      }
-    } catch (e) {
-      console.warn('Sarvam API fetch error:', e);
-    }
-    return null;
+    const t0 = performance.now();
+    const audio = await backendTts(text.slice(0, 480), this.language);
+    if (audio) analytics.timing('tts_ms', performance.now() - t0);
+    return audio;
   }
 
   private fallbackBrowserTTS(

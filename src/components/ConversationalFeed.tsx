@@ -7,12 +7,14 @@ interface ConversationalFeedProps {
   messages: Message[];
   onSendMessage: (text: string) => void;
   isProcessing: boolean;
+  nluSource?: 'llm' | 'rules' | null;
 }
 
 export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
   messages,
   onSendMessage,
   isProcessing,
+  nluSource,
 }) => {
   const [inputText, setInputText] = useState('');
   const [expandedTools, setExpandedTools] = useState<Record<string, boolean>>({});
@@ -47,9 +49,11 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
             Live Travel Conversation
           </span>
         </div>
-        <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center space-x-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-          <span>Verified Real-Time Fares</span>
+        <span
+          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${nluSource === 'rules' ? 'text-amber-800 bg-amber-50 border-amber-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'}`}
+          title="Which engine understood the last message"
+        >
+          {nluSource === 'llm' ? 'Understood by Gemini' : nluSource === 'rules' ? 'Offline rules fallback' : 'Fares from tools only'}
         </span>
       </div>
 
@@ -164,7 +168,7 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
         {isProcessing && (
           <div className="flex items-center space-x-2 text-xs text-blue-600 font-semibold animate-pulse pl-9">
             <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-            <span>Checking live flight, train, and bus availability...</span>
+            <span>Thinking…</span>
           </div>
         )}
 
@@ -190,10 +194,10 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => onSendMessage('Next Friday, 2 travellers by train')}
+          onClick={() => onSendMessage('Mumbai se Nagpur agle Friday, 2 log, train')}
           className="px-2.5 py-1 rounded-full bg-white hover:bg-blue-50 text-slate-700 hover:text-blue-700 border border-slate-200 transition cursor-pointer shrink-0 font-medium shadow-2xs"
         >
-          🗓️ Next Friday, 2 travellers
+          🗣️ Mumbai se Nagpur agle Friday, 2 log
         </button>
         <button
           type="button"
@@ -204,7 +208,7 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => onSendMessage('My money has been deducted from Google Pay but ticket pending')}
+          onClick={() => onSendMessage('Paise kat gaye but ticket pending hai')}
           className="px-2.5 py-1 rounded-full bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition cursor-pointer shrink-0 font-bold shadow-2xs"
         >
           💳 Money deducted, ticket pending
@@ -220,7 +224,7 @@ export const ConversationalFeed: React.FC<ConversationalFeedProps> = ({
           type="text"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
-          placeholder="Speak or type (e.g. 'Nagpur', 'Mumbai to Delhi next Monday', '3AC train')..."
+          placeholder="Type or speak, e.g. 'Delhi to Jaipur tomorrow, 3 people, cheapest'"
           className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white transition"
         />
         <button

@@ -1,3 +1,4 @@
+"""SANDBOX payment endpoints. No money moves. Kept as an API contract sketch; the reconciliation decision logic lives in src/services/paymentEngine.ts."""
 from fastapi import APIRouter
 from models import UpiPushRequest, ReconciliationRequest, ReconciliationResponse
 import time

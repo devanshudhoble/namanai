@@ -1,10 +1,9 @@
 import React from 'react';
-import { Sparkles, ShieldCheck, Zap, Sliders, BarChart3, RotateCcw, Headphones, Compass } from 'lucide-react';
+import { ShieldCheck, BarChart3, RotateCcw, Headphones, Compass } from 'lucide-react';
 
 interface HeaderProps {
   onOpenSettings: () => void;
   onReset: () => void;
-  latencyMs: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -47,7 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
 
           <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-semibold">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>100% Safe UPI Payment</span>
+            <span>PIN never spoken</span>
           </div>
 
           <div className="flex items-center space-x-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 text-blue-800 font-semibold">
@@ -69,10 +68,11 @@ export const Header: React.FC<HeaderProps> = ({
 
           <button
             onClick={onOpenSettings}
-            className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 border border-slate-200 transition cursor-pointer"
-            title="API Integrations & Settings"
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold transition cursor-pointer"
+            title="Journey analytics, context harness and guardrails"
           >
-            <Sliders className="w-4 h-4" />
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Insights</span>
           </button>
         </div>
       </div>

@@ -4,7 +4,10 @@ import {
   BookingHold,
   PaymentTransaction,
   AgentStateStep,
+  RefundQuote,
+  RefundRecord,
 } from '../types';
+import type { UpiFailureReason } from '../services/paymentEngine';
 import {
   Plane,
   Bus,
@@ -38,9 +41,12 @@ interface TravelCanvasProps {
   passengersCount?: number;
   onSelectOption: (opt: TravelOption) => void;
   onApprovePayment: () => void;
-  onSimulateDeductionPending: () => void;
-  onSimulatePaymentDecline: () => void;
+  onPaymentFailure: (reason: UpiFailureReason) => void;
+  onSimulateDebited: (soldOut: boolean) => void;
   onVoiceSupportQuery: (text: string) => void;
+  refundQuote: RefundQuote | null;
+  refund: RefundRecord | null;
+  auditTrail: string[];
 }
 
 export const TravelCanvas: React.FC<TravelCanvasProps> = ({
@@ -55,9 +61,12 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
   passengersCount,
   onSelectOption,
   onApprovePayment,
-  onSimulateDeductionPending,
-  onSimulatePaymentDecline,
+  onPaymentFailure,
+  onSimulateDebited,
   onVoiceSupportQuery,
+  refundQuote,
+  refund,
+  auditTrail,
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(600);
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'flight' | 'train' | 'bus' | 'hotel'>('all');
@@ -89,14 +98,16 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  const isConfirmed = step === 'confirmed' || hold?.status === 'paid' || hold?.status === 'reconciled';
-  const isPaymentPending = step === 'payment_pushed' || step === 'payment_verifying';
+  const isClosed = hold?.status === 'cancelled' || hold?.status === 'refunded';
+  const isConfirmed = !isClosed && (step === 'confirmed' || step === 'cancellation_quoted' || hold?.status === 'paid' || hold?.status === 'reconciled');
+  const isPaymentPending = (step === 'payment_pushed' || step === 'payment_verifying') && transaction?.status === 'PUSHED';
+  const isDebitedPending = transaction?.status === 'DEBITED_PENDING' && step !== 'payment_exception_recovery';
   const isExceptionRecovery = step === 'payment_exception_recovery';
 
   return (
     <div className="space-y-4">
       {/* 1. SEAT HOLD COUNTDOWN BANNER */}
-      {hold && !isConfirmed && (
+      {hold && hold.status === 'held' && !isConfirmed && !isClosed && (
         <div className="p-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center justify-between shadow-xs">
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm">
@@ -112,7 +123,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-600 font-medium">
-                Seat 12F guaranteed at ₹{hold.amount} for {hold.passenger.name}. No surge price risk.
+                Fare held at ₹{hold.amount.toLocaleString('en-IN')} for {hold.passenger.name}. Price can't change while you pay.
               </p>
             </div>
           </div>
@@ -208,16 +219,16 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
               <QrCode className="w-9 h-9 text-slate-900 p-1 bg-white border border-slate-200 rounded-lg shadow-xs" />
               <div>
                 <p className="text-slate-900 font-bold text-xs">Digiyatra & Boarding Ready</p>
-                <p className="text-[11px] text-slate-500 font-medium">Sent to WhatsApp (+91 98450 12345)</p>
+                <p className="text-[11px] text-slate-500 font-medium">Saved to My Trips (sandbox ticket)</p>
               </div>
             </div>
 
             <div className="flex items-center space-x-2">
               <button
-                onClick={() => onVoiceSupportQuery('Cancel my flight and calculate refund')}
+                onClick={() => onVoiceSupportQuery('I want to cancel my booking')}
                 className="px-3.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold transition cursor-pointer"
               >
-                Cancel or Modify via Voice
+                Cancel booking
               </button>
             </div>
           </div>
@@ -245,43 +256,72 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
             <span className="text-blue-700 font-mono font-bold">{transaction.upiVpa}</span>.
           </p>
 
-          {/* Interactive Google Pay Simulator Card */}
-          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-xs">
-            <div className="flex items-center space-x-3">
-              <div className="w-9 h-9 rounded-full bg-blue-600 flex items-center justify-center text-white font-extrabold text-xs shadow-xs">
-                GPay
-              </div>
+          {/* Sandbox UPI sheet: inside the Paytm app this is a one-tap UPI intent, PIN entered on the UPI screen */}
+          <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full bg-[#00BAF2] flex items-center justify-center text-white font-extrabold text-[10px] shadow-xs">UPI</div>
               <div>
-                <p className="text-xs font-bold text-slate-900">Google Pay • UPI Collect Request</p>
-                <p className="text-[11px] text-slate-500 font-medium">VoyAI Travel Platform requests ₹{transaction.amount}</p>
+                <p className="text-xs font-bold text-slate-900">Pay ₹{transaction.amount.toLocaleString('en-IN')} with Paytm UPI (concept)</p>
+                <p className="text-[11px] text-slate-500 font-medium">Order {transaction.orderId} · retries reuse this order, so no double charge</p>
               </div>
             </div>
-
-            {/* Test Action Buttons */}
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                onClick={onApprovePayment}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs"
-              >
-                Approve Payment (UPI PIN)
-              </button>
-
-              <button
-                onClick={onSimulateDeductionPending}
-                className="px-3 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs transition cursor-pointer shadow-xs"
-                title="Test when bank deducts money but booking takes time"
-              >
-                Simulate "Deducted but Pending"
-              </button>
-
-              <button
-                onClick={onSimulatePaymentDecline}
-                className="px-2.5 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-700 font-semibold text-xs transition cursor-pointer"
-              >
-                Decline
-              </button>
+            <button onClick={onApprovePayment} className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs transition cursor-pointer shadow-xs">
+              Approve (PIN on UPI screen)
+            </button>
+            <div className="pt-2 border-t border-slate-200">
+              <p className="text-[10px] uppercase font-bold text-slate-400 mb-1.5">Failure lab: test the payment patterns support teams see</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => onPaymentFailure('USER_DECLINED')} className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] cursor-pointer">User declined</button>
+                <button onClick={() => onPaymentFailure('BANK_TIMEOUT')} className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] cursor-pointer">Bank timeout</button>
+                <button onClick={() => onPaymentFailure('INSUFFICIENT_FUNDS')} className="px-2.5 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-[11px] cursor-pointer">Insufficient balance</button>
+                <button onClick={() => onSimulateDebited(false)} className="px-2.5 py-1.5 rounded-lg bg-amber-50 border border-amber-300 hover:bg-amber-100 text-amber-900 font-semibold text-[11px] cursor-pointer">Debited, ticket pending</button>
+                <button onClick={() => onSimulateDebited(true)} className="px-2.5 py-1.5 rounded-lg bg-rose-50 border border-rose-300 hover:bg-rose-100 text-rose-800 font-semibold text-[11px] cursor-pointer">Debited, seat sold out</button>
+              </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {isDebitedPending && (
+        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-300 text-xs text-amber-950 space-y-2">
+          <p className="font-bold flex items-center gap-2"><AlertTriangle className="w-4 h-4 text-amber-600" /> Money debited, ticket not issued yet</p>
+          <p className="text-[11px] text-slate-700">This is what the customer sees. Now report it the way they would:</p>
+          <button onClick={() => onVoiceSupportQuery('Paise kat gaye but ticket pending hai')} className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-bold text-[11px] cursor-pointer">
+            Say: "Paise kat gaye but ticket pending hai"
+          </button>
+        </div>
+      )}
+
+      {auditTrail.length > 0 && step !== 'payment_exception_recovery' && (
+        <details className="p-3 rounded-xl bg-white border border-slate-200 text-[11px] text-slate-700">
+          <summary className="font-bold cursor-pointer">3-way reconciliation audit trail</summary>
+          <ul className="mt-2 font-mono space-y-0.5 break-words">
+            {auditTrail.map((l, i) => <li key={i}>{l}</li>)}
+          </ul>
+        </details>
+      )}
+
+      {refundQuote && step === 'cancellation_quoted' && (
+        <div className="p-4 rounded-2xl bg-white border-2 border-rose-200 text-xs space-y-2">
+          <p className="font-extrabold text-slate-900 uppercase tracking-wider text-[11px]">Cancellation quote</p>
+          <div className="grid grid-cols-2 gap-1 text-slate-700">
+            <span>Paid</span><span className="text-right font-mono">₹{refundQuote.paidAmount.toLocaleString('en-IN')}</span>
+            <span>Cancellation fee</span><span className="text-right font-mono">−₹{refundQuote.cancellationFee.toLocaleString('en-IN')}</span>
+            <span>Convenience fee (non-refundable)</span><span className="text-right font-mono">−₹{refundQuote.nonRefundableConvenienceFee.toLocaleString('en-IN')}</span>
+            <span className="font-bold">You get back</span><span className="text-right font-mono font-bold text-emerald-700">₹{refundQuote.refundAmount.toLocaleString('en-IN')}</span>
+          </div>
+          <p className="text-[11px] text-slate-500">{refundQuote.rule}{refundQuote.hoursToDeparture !== null ? ` · ${refundQuote.hoursToDeparture}h to departure` : ''}</p>
+          <div className="flex gap-2">
+            <button onClick={() => onVoiceSupportQuery('Yes, cancel it')} className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-bold text-[11px] cursor-pointer">Yes, cancel</button>
+            <button onClick={() => onVoiceSupportQuery('No, keep my booking')} className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] cursor-pointer">Keep booking</button>
+          </div>
+        </div>
+      )}
+
+      {refund && isClosed && (
+        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-300 text-xs space-y-1">
+          <p className="font-extrabold text-emerald-900">Refund {refund.refundId} initiated: ₹{refund.refundAmount.toLocaleString('en-IN')}</p>
+          <p className="text-[11px] text-slate-700">{refund.rule}. Credited {refund.eta}.</p>
         </div>
       )}
 
@@ -299,13 +339,13 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
       )}
 
       {/* 5. MULTI-MODAL TRAVEL OPTIONS: FLIGHT, TRAIN, BUS, HOTEL */}
-      {options.length > 0 && !isConfirmed && (
+      {options.length > 0 && !isConfirmed && !isClosed && !hold && (
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-sm font-extrabold text-slate-900 uppercase tracking-wider flex items-center space-x-2">
               <span>Verified Travel Options</span>
               <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
-                Live Pricing & Seats
+                Sandbox inventory
               </span>
             </h3>
 
@@ -499,7 +539,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
       )}
 
       {/* 6. REAL-TIME TRIP PLANNING STEP PROGRESS (When options are not yet generated) */}
-      {options.length === 0 && !isConfirmed && !hold && (
+      {options.length === 0 && !isConfirmed && !hold && !refund && (
         <div className="bg-white rounded-3xl p-6 border border-slate-200/90 shadow-sm space-y-6">
           <div className="flex items-center justify-between pb-4 border-b border-slate-100">
             <div>
@@ -542,7 +582,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
             <div>
               <p className="font-bold text-blue-950 mb-0.5">Natural Voice Travel Planner</p>
               <p className="text-slate-600 leading-relaxed text-[11px]">
-                Speak naturally in English, Hindi, or Hinglish. Mention any state, city, or village across India. The assistant will guide you step-by-step and show verified real-time flight, IRCTC train, and intercity bus availability.
+                Say everything in one go (&quot;Mumbai se Nagpur agle Friday, 2 log, train&quot;) or answer one question at a time, in English, Hindi or Hinglish. The agent only asks for what's still missing.
               </p>
             </div>
           </div>

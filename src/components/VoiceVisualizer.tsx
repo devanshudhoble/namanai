@@ -66,7 +66,7 @@ export const VoiceVisualizer: React.FC<VoiceVisualizerProps> = ({
           />
           <span className="text-xs font-bold tracking-wide uppercase text-slate-600">
             {isSpeaking
-              ? 'Speaking (Sarvam Neural Voice)'
+              ? 'Speaking'
               : isListening
               ? 'Listening to your voice...'
               : 'Voice Assistant Ready'}

@@ -503,7 +503,7 @@ class TravelEngineService {
         mode: 'train',
         provider: 'IRCTC Indian Railways',
         operator: 'Indian Railways',
-        serviceNumber: `${trainName} Express (${trainNum})`,
+        serviceNumber: `${trainName} (${trainNum})`,
         origin: origin,
         originCode: oInfo.railwayCode,
         originTerminal: oInfo.railwayName,
@@ -744,7 +744,9 @@ class TravelEngineService {
 
   public async lockFareAndHoldPNR(
     optionId: string,
-    passenger: PassengerDetails = DEFAULT_PASSENGER
+    passenger: PassengerDetails = DEFAULT_PASSENGER,
+    passengers: number = 1,
+    travelDateISO: string | null = null
   ): Promise<BookingHold> {
     await new Promise((r) => setTimeout(r, 320));
     const option = this.currentOptions.find((o) => o.id === optionId) || this.currentOptions[0];
@@ -763,6 +765,8 @@ class TravelEngineService {
       holdExpiresAt,
       fareGuaranteed: true,
       amount: option.price,
+      passengers,
+      travelDateISO,
       status: 'held',
     };
 
@@ -793,6 +797,17 @@ class TravelEngineService {
 
   public getHold(orderId: string): BookingHold | undefined {
     return this.activeHolds.get(orderId);
+  }
+
+  /** Sandbox inventory check used by reconciliation: is the seat still sellable after the hold lapsed? */
+  public isInventoryAvailable(optionId: string): boolean {
+    const opt = this.currentOptions.find((o) => o.id === optionId);
+    return Boolean(opt && opt.seatsAvailable > 0);
+  }
+
+  public markSoldOut(optionId: string) {
+    const opt = this.currentOptions.find((o) => o.id === optionId);
+    if (opt) opt.seatsAvailable = 0;
   }
 
   public confirmHold(orderId: string): BookingHold | null {
