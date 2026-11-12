@@ -5,7 +5,8 @@
 
 A working prototype plus a product case study, built around one idea: **with money involved, the hard part isn't the LLM. It's the context engineering harness around it.**
 
-📄 **[Product case study (Paytm Travel)](docs/CASE_STUDY.md)** · 🧠 **[Context engineering design](docs/CONTEXT_ENGINEERING.md)**
+📕 **[Case study PDF: Voice-first booking for Paytm Travel](docs/Paytm_Travel_Voice_Agent_Case_Study.pdf)** (13 pages: product sense, prioritisation, AI system design, fintech layer, KPI tree, experiment design, 90-day plan)
+📄 [Case study (markdown)](docs/CASE_STUDY.md) · 🧠 [Context engineering design](docs/CONTEXT_ENGINEERING.md)
 
 > Independent concept, not affiliated with Paytm. Travel inventory and payments are **sandbox**; see [what's real vs simulated](#whats-real-vs-simulated).
 
