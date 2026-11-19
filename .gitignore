@@ -42,3 +42,6 @@ venv/
 !backend/.env.example
 .venv*/
 .pytest_cache/
+
+# MCP server venv
+.venv-mcp/

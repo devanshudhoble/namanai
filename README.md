@@ -1,5 +1,7 @@
 # VoyAI Naman: a voice booking agent for Indian travel
 
+> **Branch `mcp_feature`:** everything on `main` **plus an MCP booking server**. The same booking tools and guardrails are exposed through the Model Context Protocol, so any agent (Claude Desktop, WhatsApp, voice) can search and book across India safely. Jump to [MCP booking server](#mcp-booking-server).
+
 **Say the whole trip in one sentence, in Hinglish, and book it safely.**
 *"Mumbai se Nagpur agle Friday, 2 log, train"* → options in one turn → explicit "yes" → UPI → ticket. Failed payments, "money deducted but no ticket" and cancellations are handled in the same conversation.
 
@@ -15,6 +17,21 @@ A working prototype plus a product case study, built around one idea: **with mon
 [![Walkthrough: one Hinglish sentence to bookable options](docs/demo/highlight.gif)](docs/demo/voyai_walkthrough.mp4)
 
 **[Watch the full 2-minute walkthrough (MP4)](docs/demo/voyai_walkthrough.mp4)**: one-sentence Hinglish booking (understood by Gemini) → read-back and explicit approval → fare hold and in-app UPI → bank timeout and idempotent retry → "money debited, seat sold out" reconciled to a full auto-refund → UPI PIN blocked by the credential guard → live journey insights.
+
+---
+
+## What's built so far
+
+| # | Piece | What it is | Where |
+|---|---|---|---|
+| 1 | **Voice booking web app** | Hinglish voice and text booking: one-sentence trip extraction, read-back + explicit approval, fare hold, in-app UPI, payment failure lab, 3-way reconciliation, cancellation with refund quote | `src/`, `backend/` |
+| 2 | **Context engineering harness** | Credential guard, PII redaction, token-budgeted layered context, schema output + server validation, deterministic overrides, slot ledger, grounding validator, offline fallback | `src/services/contextHarness.ts`, `backend/routes/agent.py` |
+| 3 | **Gemini + Sarvam** | Gemini 2.5 Flash for understanding (server-side key); Sarvam Bulbul for Indian-voice TTS | `backend/routes/` |
+| 4 | **Journey analytics** | Real event funnel, drop-off, turns-to-options, latency p50/p90, guardrail counts | Insights panel, `src/services/analytics.ts` |
+| 5 | **MCP booking server** *(this branch)* | 9 tools, 2 resources and 1 prompt; any Indian city, town or village; harness enforced in code | `mcp_server/`, [docs/MCP.md](docs/MCP.md) |
+| 6 | **Tests & eval** | 22 frontend + 5 backend + 16 MCP tests; 30-utterance Hinglish NLU eval | `src/__tests__`, `backend/tests`, `mcp_server/tests` |
+| 7 | **Product strategy memo** | 15-page PDF: personas, GTM, product design, execution, PR/FAQ, KPI tree, pre-mortem | [PDF](docs/Paytm_Travel_Voice_Agent_Case_Study.pdf) |
+| 8 | **Walkthrough video** | 2-minute captioned demo | [MP4](docs/demo/voyai_walkthrough.mp4) |
 
 ---
 
@@ -86,6 +103,41 @@ Each area below is framed the way it would be run in a product team: the custome
 ### 5. Real-world use cases from travel platforms
 Six demo scenarios (one-shot Hinglish booking, partial intent, price-sensitive comparison, baggage question, PIN-leak attempt, post-booking cancellation) plus five payment-failure simulations, all reproducible in the UI and covered by end-to-end tests.
 
+## MCP booking server
+
+The booking tools are also exposed as a **Model Context Protocol server** (`mcp_server/`, official Python SDK). Any MCP client can discover and call them, and **the harness is enforced inside the server**, so even a badly prompted agent can't book without consent or touch a PIN.
+
+```mermaid
+flowchart LR
+    U["Customer"] --> A["Any AI assistant"] --> C["MCP client"]
+    C <-->|"tools · resources · prompts"| S["voyai-naman-travel MCP server"]
+    S --> H["Harness in code: credential guard · consent gate ·<br/>server-side prices · idempotency"]
+    S --> T["Sandbox engine → real Paytm / IRCTC / airline / bus APIs later"]
+```
+
+| Tool | Purpose |
+|---|---|
+| `search_trips` | Flights, trains and buses between **any two places in India**; budget and time-of-day filters; cheapest and fastest |
+| `get_fare_rules` | Baggage, refund rule, cancellation fees |
+| `hold_fare` | 10-min fare lock. **Needs `customer_confirmed` + the customer's own words** |
+| `request_upi_payment` | UPI intent on the same order id (no double charge); PIN only on the UPI screen |
+| `sandbox_payment_event` | Simulates bank outcomes (sandbox only; a webhook in production) |
+| `get_booking_status` | Status, PNR, refund, audit trail |
+| `reconcile_payment` | Money debited, no ticket → issue ticket or full auto-refund |
+| `quote_refund` / `cancel_booking` | Exact refund first, cancel only after a yes |
+
+**All of India:** about 60 hubs with real airport and station names and realistic distances; any other town or village gets generated train and bus options. Towns without an airport get no invented flights, just *"No airport in Haridwar. Nearest airport: Dehradun."*
+
+```bash
+pip install -r mcp_server/requirements.txt
+python -m mcp_server.server              # stdio; add to Claude Desktop config (see docs/MCP.md)
+python -m pytest mcp_server/tests        # 16 tests, including a real MCP client
+```
+
+Full design, flow table and Claude Desktop config: **[docs/MCP.md](docs/MCP.md)**
+
+---
+
 ## Screens
 
 | One sentence → options (0 follow-up questions) | Read-back + explicit approval |
@@ -128,6 +180,7 @@ Why this shape: an end-to-end generative agent can invent a fare or a PNR. Here 
 | Context harness: guards, redaction, slot ledger, token budget, grounding validator | ✅ Real |
 | Sarvam Bulbul TTS (proxied; key never reaches the browser) | ✅ Real, when `SARVAM_API_KEY` is set. Otherwise browser voice |
 | Speech-to-text | Browser Web Speech API (`en-IN` / `hi-IN`) |
+| MCP booking server (tools, resources, prompt; harness in code) | ✅ Real protocol; sandbox inventory behind it |
 | Journey analytics, latency p50/p90 | ✅ Real, measured in the browser |
 | Flights / trains / buses / hotels, fares, PNRs | 🧪 Sandbox generator |
 | UPI, bank callbacks, refunds | 🧪 Sandbox. Decision logic is real; no money moves |
@@ -158,6 +211,7 @@ npm run dev
 npm test          # 22 tests: harness guards, grounding, refund maths, full journeys incl. payment failures
 npm run eval      # 30-utterance English/Hindi/Hinglish NLU golden set with accuracy report
 cd backend && pip install -r requirements-dev.txt && pytest   # 5 tests: server-side validation, fallback
+python -m pytest mcp_server/tests   # 16 tests: all-India search, guardrails, payments, refunds, real MCP client
 ```
 
 The current golden set scores 100% intent and slot accuracy. It was written alongside the rules, so treat it as a **regression floor**. The case study explains how a real golden set would be built from production utterances.
