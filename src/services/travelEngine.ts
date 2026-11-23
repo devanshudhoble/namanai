@@ -710,7 +710,7 @@ class TravelEngineService {
           id: `opt-carpool-${Date.now()}-${12 + i}`,
           mode: 'carpool',
           provider: `${p.driver} (verified work email)`,
-          operator: 'Paytm Carpool',
+          operator: 'VoyAI Carpool',
           serviceNumber: `${p.car} · ${p.offered} seats offered`,
           origin: origin,
           originCode: `${oInfo.code}-POOL`,
