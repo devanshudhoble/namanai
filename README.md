@@ -32,6 +32,7 @@ A working prototype plus a product case study, built around one idea: **with mon
 | 6 | **Tests & eval** | 22 frontend + 5 backend + 16 MCP tests; 30-utterance Hinglish NLU eval | `src/__tests__`, `backend/tests`, `mcp_server/tests` |
 | 7 | **Product strategy memo** | 15-page PDF: personas, GTM, product design, execution, PR/FAQ, KPI tree, pre-mortem | [PDF](docs/Paytm_Travel_Voice_Agent_Case_Study.pdf) |
 | 8 | **Walkthrough video** | 2-minute captioned demo | [MP4](docs/demo/voyai_walkthrough.mp4) |
+| 9 | **APM research pack** | Sourced market research (India vs global labelled), competitor analysis, journey map + funnel, payment and cancellation taxonomy, proto-personas + interview plan, AI opportunity matrix + RICE, master spreadsheet, wireframes, presentation deck | [docs/research/](docs/research/README.md) |
 
 ---
 

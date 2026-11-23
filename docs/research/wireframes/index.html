@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Voice Booking Wireframes</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--ink:#1d2330;--mute:#6b7280;--line:#cfd4dc;--fill:#e7eaef;--accent:#0b5cad;--ok:#1f7a4d;--warn:#a15c00;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12151b;--card:#1b2029;--ink:#e6e9ef;--mute:#9aa3b2;--line:#3a4250;--fill:#252c37;--accent:#6aa9ec;--ok:#5cc48d;--warn:#e0a24a;--bad:#f07a6e}}
+:root[data-theme="dark"]{--bg:#12151b;--card:#1b2029;--ink:#e6e9ef;--mute:#9aa3b2;--line:#3a4250;--fill:#252c37;--accent:#6aa9ec;--ok:#5cc48d;--warn:#e0a24a;--bad:#f07a6e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;padding:24px 16px 48px}
+header{max-width:1200px;margin:0 auto 20px}
+h1{font-size:22px;margin:0 0 6px}
+header p{margin:0;color:var(--mute);max-width:760px}
+.flow{max-width:1200px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:22px}
+figure{margin:0}
+figcaption{font-weight:600;margin:0 0 4px}
+figcaption small{display:block;font-weight:400;color:var(--mute)}
+.phone{background:var(--card);border:2px solid var(--line);border-radius:26px;padding:14px 12px;height:480px;display:flex;flex-direction:column;gap:8px;overflow:hidden}
+.bar{display:flex;justify-content:space-between;color:var(--mute);font-size:11px;border-bottom:1px dashed var(--line);padding-bottom:6px}
+.box{border:1.5px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--fill)}
+.ghost{height:10px;border-radius:5px;background:var(--fill);border:1px solid var(--line)}
+.bub{max-width:85%;padding:7px 10px;border-radius:12px;font-size:13px}
+.me{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:3px}
+.ai{align-self:flex-start;background:var(--fill);border:1px solid var(--line);border-bottom-left-radius:3px}
+.btn{border:1.5px solid var(--accent);color:var(--accent);border-radius:999px;padding:7px 10px;text-align:center;font-weight:600;font-size:13px}
+.btn.primary{background:var(--accent);color:#fff}
+.mic{width:76px;height:76px;border-radius:50%;border:3px solid var(--accent);margin:8px auto;display:grid;place-items:center;font-weight:700;color:var(--accent)}
+.opt{display:flex;justify-content:space-between;gap:6px;font-size:12.5px}
+.opt b{font-size:13px}
+.tag{font-size:10.5px;border:1px solid var(--line);border-radius:6px;padding:1px 5px;color:var(--mute)}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.spacer{flex:1}
+.note{font-size:12px;color:var(--mute);margin-top:6px}
+.steps{list-style:none;padding:0;margin:0;font-size:12.5px}
+.steps li{padding:5px 0 5px 18px;position:relative;border-left:2px solid var(--line);margin-left:6px}
+.steps li::before{content:"";position:absolute;left:-7px;top:8px;width:12px;height:12px;border-radius:50%;background:var(--card);border:2px solid var(--line)}
+.steps li.done::before{background:var(--ok);border-color:var(--ok)}
+.steps li.now::before{background:var(--warn);border-color:var(--warn)}
+section.legend{max-width:1200px;margin:28px auto 0;color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+<h1>Voice booking inside Paytm Checkin: low-fidelity wireframes</h1>
+<p>Happy path plus two failure paths, for Sunita (Hindi-first family booker). Grey blocks are placeholders. To move these into Figma, use an HTML-to-Figma import plugin (e.g. html.to.design) on this page, or rebuild each frame at 360×780.</p>
+</header>
+
+<div class="flow">
+
+<figure><figcaption>1 · Entry <small>Voice is an option, not a replacement for search</small></figcaption>
+<div class="phone"><div class="bar"><span>Paytm Checkin</span><span>🔔</span></div>
+<div class="box">Train · Bus · Flight</div>
+<div class="box">From ____ &nbsp; To ____ &nbsp; Date ____</div>
+<div class="btn">Search</div>
+<div class="spacer"></div>
+<div class="box" style="text-align:center"><b>🎙 Bol ke book karo</b><div class="note">"Mumbai se Nagpur Friday, 2 log, train"</div></div>
+<div class="ghost"></div><div class="ghost" style="width:70%"></div>
+</div>
+<p class="note">Entry shown to Hindi-locale users first (experiment E4).</p></figure>
+
+<figure><figcaption>2 · Listening <small>One sentence fills every slot it can</small></figcaption>
+<div class="phone"><div class="bar"><span>← Assistant</span><span>हिंदी / EN</span></div>
+<div class="bub me">Mumbai se Nagpur agle Friday, 2 log, train, AC chahiye</div>
+<div class="box" style="font-size:12.5px">From <b>Mumbai (CSMT)</b> · To <b>Nagpur</b><br>Fri 27 Nov · <b>2</b> adults · <b>Train, AC</b></div>
+<div class="bub ai">Theek hai. Kitne baje tak nikalna hai? Subah ya shaam?</div>
+<div class="spacer"></div>
+<div class="mic">●</div>
+<p class="note" style="text-align:center">Tap to speak · or type</p>
+</div>
+<p class="note">Asks only for what is missing. Captured slots stay visible and editable.</p></figure>
+
+<figure><figcaption>3 · Options <small>Shortlist of 3, real totals, cross-mode nudge</small></figcaption>
+<div class="phone"><div class="bar"><span>← 3 options</span><span>Cheapest · Fastest</span></div>
+<div class="box"><div class="opt"><b>Duronto 12289</b><b>₹3,480 total</b></div><div class="opt"><span>20:15 → 07:20 · 3A</span><span class="ok">Available</span></div></div>
+<div class="box"><div class="opt"><b>Vidarbha Exp</b><b>₹2,960 total</b></div><div class="opt"><span>19:05 → 09:10 · 3A</span><span class="warn">RAC 4</span></div></div>
+<div class="box"><div class="opt"><b>Sewagram Exp</b><b>₹3,100 total</b></div><div class="opt"><span>21:00 → 11:45 · 3A</span><span class="ok">Available</span></div></div>
+<div class="box" style="font-size:12.5px">🚌 Bus is <b>₹900 cheaper</b> (₹2,580), 2 h slower. <u>Show bus</u></div>
+<div class="spacer"></div>
+<div class="note">Total includes fare + convenience fee + GST. <span class="tag">sandbox prices</span></div>
+</div>
+<p class="note">Every ₹ shown comes from tool output (grounding validator).</p></figure>
+
+<figure><figcaption>4 · Read-back and approval <small>Nothing is booked without the user's own "yes"</small></figcaption>
+<div class="phone"><div class="bar"><span>← Confirm</span><span></span></div>
+<div class="bub ai">Duronto 12289, Fri 27 Nov, 20:15 Mumbai CSMT se. 2 log, 3A. <b>Total ₹3,480.</b> 48 ghante pehle cancel karne par ₹240 katega. Book kar doon?</div>
+<div class="box" style="font-size:12.5px">Passengers: Sunita (46, F) · Ramesh (50, M) <u>change</u></div>
+<div class="bub me">Haan, book kar do</div>
+<div class="spacer"></div>
+<div class="btn primary">Yes, hold fare for 10 min</div>
+<div class="btn">Change something</div>
+</div>
+<p class="note">Read-back covers time, total and refund rule (prevents C5 wrong bookings).</p></figure>
+
+<figure><figcaption>5 · Pay with UPI <small>PIN only on the UPI screen, never in the chat</small></figcaption>
+<div class="phone"><div class="bar"><span>Paytm UPI</span><span>⏱ 9:41 left</span></div>
+<div class="box" style="text-align:center">Pay <b>₹3,480</b><div class="note">Fare held until 10:12</div></div>
+<div class="box">UPI PIN &nbsp; ● ● ● ● _ _</div>
+<div class="spacer"></div>
+<div class="bub ai" style="font-size:12px">🔒 Main kabhi aapka PIN ya OTP nahi poochunga.</div>
+<div class="btn primary">Pay</div>
+</div>
+<p class="note">If the user says a PIN aloud, the credential guard blocks it before logs or the model.</p></figure>
+
+<figure><figcaption>6a · Failure: bank timeout <small>Same order, no double charge</small></figcaption>
+<div class="phone"><div class="bar"><span>← Assistant</span><span></span></div>
+<div class="bub ai"><span class="warn">Bank ne jawab nahi diya.</span> Aapka paisa <b>nahi kata</b>. Seat abhi bhi 7 min ke liye hold hai.</div>
+<div class="btn primary">Retry with same order</div>
+<div class="btn">Try another UPI app</div>
+<div class="spacer"></div>
+<div class="note">Only one charge can happen on this order (idempotency key). Taxonomy P2, P8.</div>
+</div></figure>
+
+<figure><figcaption>6b · Failure: debited, no ticket <small>The assistant owns it until it's fixed</small></figcaption>
+<div class="phone"><div class="bar"><span>← Booking status</span><span></span></div>
+<div class="bub ai"><span class="bad">₹3,480 kat gaye, par seat sold out ho gayi.</span> Pura refund shuru kar diya hai.</div>
+<ul class="steps">
+<li class="done">Payment received · 10:04</li>
+<li class="done">Ticket failed at IRCTC · 10:04</li>
+<li class="done">Refund started · ref RF8812 · 10:05</li>
+<li class="now">Back in bank a/c ••12 by Sat 28 Nov</li>
+</ul>
+<div class="spacer"></div>
+<div class="btn primary">Find another train</div>
+<div class="note">Taxonomy P7. Date shown is well inside RBI T+5.</div>
+</div></figure>
+
+<figure><figcaption>7 · Cancel with refund quote <small>Know the amount before confirming</small></figcaption>
+<div class="phone"><div class="bar"><span>← My trips</span><span></span></div>
+<div class="bub me">Friday wali ticket cancel karni hai</div>
+<div class="bub ai">Cancel karne par <b>₹3,240 wapas</b> milenge (₹240 cancellation charge). Pakka cancel karoon?</div>
+<div class="spacer"></div>
+<div class="btn primary">Yes, cancel</div>
+<div class="btn">Keep ticket</div>
+<div class="note">Quote from the policy engine (MCP quote_refund), never from the model. Taxonomy C1.</div>
+</div></figure>
+
+</div>
+<section class="legend">All fares, trains and refs are made-up sandbox examples. Hindi lines are draft copy for usability testing.</section>
+</body>
+</html>

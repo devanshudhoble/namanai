@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bol Ke Book Karo</title>
+<style>
+:root{--bg:#0f1724;--slide:#ffffff;--ink:#132033;--mute:#5b6678;--accent:#0b5cad;--soft:#eaf2fb;--line:#d6dde7;--ok:#1f7a4d;--bad:#b42318}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--slide:#18202c;--ink:#e7ebf2;--mute:#9ea8b8;--accent:#6aa9ec;--soft:#1f2c3d;--line:#334055;--ok:#5cc48d;--bad:#f07a6e}}
+:root[data-theme="dark"]{--slide:#18202c;--ink:#e7ebf2;--mute:#9ea8b8;--accent:#6aa9ec;--soft:#1f2c3d;--line:#334055;--ok:#5cc48d;--bad:#f07a6e}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.deck{height:100%;display:grid;place-items:center;padding:16px}
+.slide{display:none;width:min(1100px,100%);aspect-ratio:16/9;background:var(--slide);color:var(--ink);border-radius:14px;padding:clamp(18px,4vw,52px);overflow:auto;flex-direction:column}
+.slide.on{display:flex}
+.kicker{color:var(--accent);font-weight:700;letter-spacing:.06em;text-transform:uppercase;font-size:12px;margin-bottom:6px}
+h1{font-size:clamp(26px,4.4vw,48px);margin:0 0 10px;line-height:1.1}
+h2{font-size:clamp(20px,3vw,32px);margin:0 0 14px;line-height:1.15}
+p{margin:0 0 10px}
+.mute{color:var(--mute)}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.card{background:var(--soft);border-radius:10px;padding:12px 14px}
+.card b{display:block;margin-bottom:4px}
+.big{font-size:clamp(22px,3vw,34px);font-weight:800;color:var(--accent)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{color:var(--mute);font-weight:600}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;font-size:14px}
+.flow span{background:var(--soft);border-radius:8px;padding:6px 10px}
+.flow i{color:var(--mute);font-style:normal}
+.src{margin-top:auto;font-size:11.5px;color:var(--mute)}
+.src a{color:var(--mute)}
+.nav{position:fixed;bottom:10px;right:16px;color:#9ea8b8;font-size:13px;display:flex;gap:8px;align-items:center}
+.nav button{background:#1f2c3d;color:#e7ebf2;border:0;border-radius:6px;padding:6px 12px;font-size:14px;cursor:pointer}
+ul{margin:0 0 10px;padding-left:20px}
+li{margin-bottom:4px}
+</style>
+</head>
+<body>
+<div class="deck">
+
+<section class="slide on">
+<div class="kicker">AI APM case study · Paytm Travel</div>
+<h1>Bol ke book karo</h1>
+<p style="font-size:20px">Say the trip once. Hear the real total. Never wonder where your money went.</p>
+<p class="mute">A voice booking assistant for bus and train inside Paytm Checkin, for Hindi-first travellers.<br>Research, PRD-level scope and a working prototype with an MCP booking server.</p>
+<p class="src">Independent concept, not affiliated with Paytm. Prices and payments in the demo are sandbox.</p>
+</section>
+
+<section class="slide">
+<div class="kicker">01 · Why now</div>
+<h2>The next travellers are Hindi-first, mobile-only, and on trains and buses</h2>
+<div class="grid">
+<div class="card"><div class="big">36–47%</div>of India online travel is transport (flight + train + bus)</div>
+<div class="card"><div class="big">~89%</div>of rail reservations are online; third-party apps do ~28% of them</div>
+<div class="card"><div class="big">57%</div>of India's internet users are rural (2025)</div>
+<div class="card"><div class="big">1 in 5</div>internet users use voice commands</div>
+</div>
+<p class="src">Sources: <a href="https://www.mordorintelligence.com/industry-reports/online-travel-market-in-india">Mordor</a>, <a href="https://imarcgroup.com/india-online-travel-market">IMARC</a>, <a href="https://www.tribuneindia.com/news/business/irctc-names-paytm-among-platforms-driving-28-of-online-railway-ticket-bookings/">IRCTC via Tribune</a>, <a href="https://yourstory.com/2026/01/indias-internet-user-base-crosses-950-million-2025-iamai-report">IAMAI-Kantar 2025</a>, <a href="https://www.iamai.in/sites/default/files/research/Kantar_%20IAMAI%20report_2024_.pdf">IAMAI-Kantar 2024</a></p>
+</section>
+
+<section class="slide">
+<div class="kicker">02 · Problem</div>
+<h2>Users don't lose the trip at search. They lose it between "compare" and "ticket in hand"</h2>
+<table>
+<tr><th>Research area</th><th>What we found</th><th>Label</th></tr>
+<tr><td>Journey</td><td>Travel abandonment is 80–90%; 7 in 10 struggle with Tatkal</td><td>Global / India</td></tr>
+<tr><td>Conversion</td><td>60% say travel apps hide the convenience fee until checkout</td><td>India</td></tr>
+<tr><td>Payment</td><td>UPI declines are low (~0.7–0.8%) but "money deducted, no ticket" is a top complaint</td><td>India</td></tr>
+<tr><td>Cancellation</td><td>Refunds and cancellations are the top complaint about travel apps</td><td>India</td></tr>
+</table>
+<p style="margin-top:12px"><b>Insight:</b> failures are rare, but the <b>uncertainty</b> after one is what breaks trust.</p>
+<p class="src">Sources: <a href="https://contentsquare.com/blog/travel-booking-abandonment/">Contentsquare</a>, <a href="https://www.business-standard.com/india-news/irctc-tatkal-ticketing-error-indian-railways-agents-125060200354_1.html">LocalCircles via BS</a>, <a href="https://localcircles.com/a/press/page/travel-apps-survey">LocalCircles</a>, <a href="https://inc42.com/buzz/technical-glitches-on-upi-have-fallen-below-1/amp">Inc42</a></p>
+</section>
+
+<section class="slide">
+<div class="kicker">03 · Users</div>
+<h2>Three proto-personas (to validate with 15 interviews)</h2>
+<div class="grid">
+<div class="card"><b>Sunita, 46, Wardha</b>Hindi-first family booker.<br><i>"Book the right train for 4 without asking my son."</i></div>
+<div class="card"><b>Arjun, 29, Bengaluru</b>Price-sensitive regular.<br><i>"Cheapest decent option, now, without 4 apps."</i></div>
+<div class="card"><b>Rahul, after a failed payment</b>A moment, not a segment.<br><i>"Is my money gone? Do I have a ticket?"</i></div>
+</div>
+<p class="mute" style="margin-top:12px">No interviews run yet. Script and kill criteria in docs/research/05.</p>
+</section>
+
+<section class="slide">
+<div class="kicker">04 · Competition</div>
+<h2>Hindi voice booking is now table stakes. Owning the payment is not.</h2>
+<table>
+<tr><th></th><th>Voice + Hindi</th><th>Post-booking AI</th><th>Owns payment rail</th></tr>
+<tr><td>MakeMyTrip Myra 2.0</td><td>Yes, 8 languages</td><td>Yes</td><td>No</td></tr>
+<tr><td>ixigo TARA</td><td>Yes, Hinglish</td><td>76% voice calls AI-resolved*</td><td>No</td></tr>
+<tr><td>redBus RAY</td><td>Yes</td><td>WhatsApp bot</td><td>No</td></tr>
+<tr><td>Paytm Checkin</td><td>Speak or type; multilingual</td><td>Unknown</td><td><b>Yes</b></td></tr>
+</table>
+<p style="margin-top:12px"><b>Paytm's edge:</b> it knows the real payment state instantly, so the assistant can fix failures in the same conversation.</p>
+<p class="src">*Company-reported. Sources: <a href="https://www.indiatvnews.com/technology/news/makemytrip-myra-2-0-ai-asssistant-to-help-completing-travel-bookings-through-voice-conversations-2026-05-14-1041087">India TV</a>, <a href="https://skift.com/2026/05/24/india-is-where-the-voice-first-travel-app-gets-built/">Skift</a>, <a href="https://analyticsindiamag.com/ai-trends/redbus-builds-multilingual-ai-copilots-for-bus-operators-travellers">AIM</a>, <a href="https://skift.com/2025/11/10/indian-fintech-paytm-pushes-deeper-into-travel-with-new-ai-backed-app/">Skift</a></p>
+</section>
+
+<section class="slide">
+<div class="kicker">05 · Prioritisation</div>
+<h2>RICE says: fix the basics without AI, then put AI on top</h2>
+<table>
+<tr><th>Opportunity</th><th>RICE</th><th>AI?</th></tr>
+<tr><td>Final total on results card</td><td>7.2</td><td>No</td></tr>
+<tr><td>Reconciliation + honest money/ticket status</td><td>3.2</td><td>No (logic)</td></tr>
+<tr><td>Fare hold + retry on same order</td><td>2.8</td><td>No</td></tr>
+<tr><td>Payment &amp; refund status assistant</td><td>2.4</td><td>Yes</td></tr>
+<tr><td>One-sentence Hinglish voice booking</td><td>1.0</td><td>Yes</td></tr>
+<tr><td>Itinerary / generic Q&amp;A chat</td><td>0.2–0.25</td><td>Yes · <b>cut</b></td></tr>
+</table>
+<p class="src">All RICE inputs are assumptions to re-score with Paytm data.</p>
+</section>
+
+<section class="slide">
+<div class="kicker">06 · MVP</div>
+<h2>One assistant, train + bus, Hindi + Hinglish</h2>
+<div class="flow"><span>"Mumbai se Nagpur Friday, 2 log"</span><i>→</i><span>3 options, real totals</span><i>→</i><span>Read-back: time, total, refund rule</span><i>→</i><span>"Haan, book kar do"</span><i>→</i><span>Fare held 10 min</span><i>→</i><span>Paytm UPI (PIN on UPI screen)</span><i>→</i><span>Ticket, or honest fix</span></div>
+<div class="grid" style="margin-top:16px">
+<div class="card"><b>In</b>Train + bus, voice + text, read-back, fare hold, retry, reconciliation, refund quote</div>
+<div class="card"><b>Next</b>Flights, cross-mode compare, proactive cancel alerts</div>
+<div class="card"><b>Out</b>Itineraries, hotels, generic Q&amp;A, bookings without the user's words</div>
+</div>
+</section>
+
+<section class="slide">
+<div class="kicker">07 · AI architecture</div>
+<h2>The LLM understands. Tools decide. Templates speak.</h2>
+<div class="flow"><span>Voice / text</span><i>→</i><span>Credential guard + PII redaction</span><i>→</i><span>Layered context (≤1,200 tokens)</span><i>→</i><span>Gemini → schema JSON</span><i>→</i><span>Server validation + rule overrides</span><i>→</i><span>MCP tools: search, fare rules, hold, UPI, reconcile, refund</span><i>→</i><span>Grounding validator</span><i>→</i><span>Reply + Sarvam TTS</span></div>
+<ul style="margin-top:16px">
+<li><b>MCP server</b>: the same 9 tools and guardrails for app, voice, WhatsApp or any agent</li>
+<li><b>In-code guardrails</b>: no booking without the customer's own words; prices set server-side; idempotent retries</li>
+<li><b>Graceful degradation</b>: offline understanding engine if the LLM is slow or down</li>
+</ul>
+</section>
+
+<section class="slide">
+<div class="kicker">08 · Success metrics &amp; evaluation</div>
+<h2>Ship only if completion goes up and guardrails stay clean</h2>
+<div class="grid">
+<div class="card"><b>North star</b>Booking completion rate, Hindi-locale cohort (session → ticket)</div>
+<div class="card"><b>Secondary</b>Time to book · turns to options · payment-step recovery · refund contacts / 1k bookings</div>
+<div class="card"><b>Guardrails</b>PIN/OTP to model = 0 · ungrounded ₹ = 0 · wrong bookings ≤ control · p90 ≤ 2.5 s</div>
+<div class="card"><b>Offline eval</b>30-utterance Hinglish NLU set · 22 + 5 + 16 automated tests passing</div>
+</div>
+<p style="margin-top:12px">A/B test: 50/50 Hindi-locale users, after "final total upfront" ships to both arms. Kill if no lift in 4 weeks or any credential leak.</p>
+</section>
+
+<section class="slide">
+<div class="kicker">09 · Demo</div>
+<h2>Live prototype: 2 minutes</h2>
+<ol>
+<li>One Hinglish sentence → options in one turn</li>
+<li>Read-back and explicit "yes" → fare hold → UPI</li>
+<li>Bank timeout → retry on same order, no double charge</li>
+<li>"Money debited, seat sold out" → reconciled → full auto-refund</li>
+<li>User says their PIN → blocked by the credential guard</li>
+<li>Same booking through the MCP server from another client</li>
+</ol>
+<p class="mute">Sandbox inventory and payments. The guardrails and decision logic are real.</p>
+</section>
+
+<section class="slide">
+<div class="kicker">10 · First 90 days &amp; open questions</div>
+<h2>What I'd do as an APM on this</h2>
+<div class="grid">
+<div class="card"><b>Weeks 1–3</b>Pull funnel + payment + refund-contact data; 15 interviews; competitor teardown on real phones</div>
+<div class="card"><b>Weeks 4–8</b>Ship E1 final total + E2 saved travellers; build golden eval set from real utterances</div>
+<div class="card"><b>Weeks 9–13</b>Assistant behind a flag for Hindi-locale users; run E4; weekly guardrail review</div>
+</div>
+<p style="margin-top:14px"><b>Questions for the team:</b> How is Checkin's assistant used today? Where does Paytm's train funnel drop most? What share of refund contacts are "debited, no ticket"?</p>
+</section>
+
+</div>
+<div class="nav"><button id="prev" aria-label="Previous slide">←</button><span id="count">1 / 11</span><button id="next" aria-label="Next slide">→</button></div>
+<script>
+const s=[...document.querySelectorAll('.slide')];let i=0;const c=document.getElementById('count');
+function go(n){s[i].classList.remove('on');i=Math.max(0,Math.min(s.length-1,n));s[i].classList.add('on');c.textContent=(i+1)+' / '+s.length;}
+document.getElementById('prev').onclick=()=>go(i-1);document.getElementById('next').onclick=()=>go(i+1);
+document.addEventListener('keydown',e=>{if(['ArrowRight','PageDown',' '].includes(e.key))go(i+1);if(['ArrowLeft','PageUp'].includes(e.key))go(i-1);});
+go(0);
+</script>
+</body>
+</html>
