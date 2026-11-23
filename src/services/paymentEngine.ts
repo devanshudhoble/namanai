@@ -44,7 +44,7 @@ export function quoteRefund(hold: BookingHold, now: number = Date.now()): Refund
   const opt = hold.selectedOption;
   const dep = departureTimestamp(hold.travelDateISO, opt.departureTime);
   const hoursToDeparture = dep === null ? null : Math.round(((dep - now) / 36e5) * 10) / 10;
-  const units = opt.mode === 'hotel' ? 1 : Math.max(1, hold.passengers);
+  const units = opt.mode === 'hotel' || opt.mode === 'cab' ? 1 : Math.max(1, hold.passengers); // a car is cancelled per vehicle
   const convenience = opt.convenienceFee;
 
   if (!opt.cancellation.refundable) {

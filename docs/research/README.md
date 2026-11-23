@@ -21,6 +21,8 @@ This folder holds the research behind the case study and prototype. It follows o
 | 7 | Master research spreadsheet (all of the above in one workbook) | [research_master.xlsx](research_master.xlsx) |
 | 8 | Low-fidelity wireframes (Figma-ready) | [wireframes/index.html](wireframes/index.html) |
 | 9 | Final case study presentation | [presentation/index.html](presentation/index.html) |
+| 10 | **New: cars, outstation cabs, rentals and carpool:** market, Paytm gap, competitors, pain points, regulation, voice AI and AI analytics | [07_cars_cabs_carpool_research.md](07_cars_cabs_carpool_research.md) |
+| 11 | **New: PRD for cars and carpool** (user stories, requirements, operator side, metrics, rollout) | [08_cars_prd.md](08_cars_prd.md) |
 
 Open the HTML files in a browser. The presentation uses the arrow keys.
 

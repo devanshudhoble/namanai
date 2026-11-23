@@ -23,7 +23,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import date, datetime, timedelta
 from typing import Literal
 
-Mode = Literal["flight", "train", "bus"]
+Mode = Literal["flight", "train", "bus", "cab", "carpool"]
 
 # ---------------------------------------------------------------------------
 # Locations: any Indian city, town or village works.
@@ -131,6 +131,11 @@ COORDS = {
     "shimla": (31.10, 77.17), "manali": (32.24, 77.19), "darjeeling": (27.04, 88.26), "wardha": (20.75, 78.60),
     "kota": (25.21, 75.86), "ujjain": (23.18, 75.78), "mathura": (27.49, 77.67), "gurugram": (28.46, 77.03),
     "noida": (28.54, 77.39), "pachmarhi": (22.47, 78.43),
+    # Popular car-trip destinations (no airport; road-trip distances for search_cars)
+    "mahabaleshwar": (17.92, 73.66), "lonavala": (18.75, 73.41), "ajmer": (26.45, 74.64), "pushkar": (26.49, 74.55),
+    "kolhapur": (16.70, 74.24), "thane": (19.22, 72.98), "navi mumbai": (19.03, 73.03), "alibaug": (18.64, 72.87),
+    "coorg": (12.42, 75.74), "ooty": (11.41, 76.70), "mussoorie": (30.46, 78.07), "nainital": (29.38, 79.46),
+    "mount abu": (24.59, 72.71), "vrindavan": (27.58, 77.70), "lonar": (19.98, 76.52),
 }
 
 ROAD_ONLY = {"manali", "noida"}  # no mainline railway in this sandbox
@@ -303,6 +308,8 @@ class Option:
     cancellation_fee_before_24h: int
     cancellation_fee_within_24h: int
     refund_rule: str
+    priced_per: str = "traveller"  # "traveller" (seat) or "vehicle" (whole car)
+    extras: dict = field(default_factory=dict)
 
     def summary(self) -> dict:
         d = asdict(self)
@@ -380,6 +387,108 @@ def _buses(o: Place, d: Place, day: date, pax: int) -> list[Option]:
             refund_rule="Full refund minus fee; 50% fee within 24h of departure"))
     return out
 
+
+# ---------------------------------------------------------------------------
+# Cars: outstation cabs, hourly rentals, transfers from local tours & travels
+# operators, plus cost-shared carpool. Same Option/Order pipeline as trains.
+# ---------------------------------------------------------------------------
+
+STATE_OF = {
+    "mumbai": "Maharashtra", "pune": "Maharashtra", "nagpur": "Maharashtra", "aurangabad": "Maharashtra",
+    "nashik": "Maharashtra", "shirdi": "Maharashtra", "wardha": "Maharashtra", "kolhapur": "Maharashtra",
+    "thane": "Maharashtra", "navi mumbai": "Maharashtra", "mahabaleshwar": "Maharashtra", "lonavala": "Maharashtra",
+    "alibaug": "Maharashtra", "lonar": "Maharashtra", "pushkar": "Rajasthan", "mount abu": "Rajasthan",
+    "coorg": "Karnataka", "ooty": "Tamil Nadu", "mussoorie": "Uttarakhand", "nainital": "Uttarakhand",
+    "vrindavan": "Uttar Pradesh",
+    "delhi": "Delhi", "gurugram": "Haryana", "noida": "Uttar Pradesh", "bengaluru": "Karnataka", "mysuru": "Karnataka",
+    "mangaluru": "Karnataka", "chennai": "Tamil Nadu", "coimbatore": "Tamil Nadu", "madurai": "Tamil Nadu",
+    "kolkata": "West Bengal", "darjeeling": "West Bengal", "hyderabad": "Telangana", "ahmedabad": "Gujarat",
+    "surat": "Gujarat", "vadodara": "Gujarat", "jaipur": "Rajasthan", "jodhpur": "Rajasthan", "udaipur": "Rajasthan",
+    "kota": "Rajasthan", "ajmer": "Rajasthan", "lucknow": "Uttar Pradesh", "varanasi": "Uttar Pradesh",
+    "agra": "Uttar Pradesh", "kanpur": "Uttar Pradesh", "prayagraj": "Uttar Pradesh", "ayodhya": "Uttar Pradesh",
+    "mathura": "Uttar Pradesh", "goa": "Goa", "kochi": "Kerala", "kozhikode": "Kerala", "thiruvananthapuram": "Kerala",
+    "chandigarh": "Chandigarh", "patna": "Bihar", "bhopal": "Madhya Pradesh", "indore": "Madhya Pradesh",
+    "gwalior": "Madhya Pradesh", "jabalpur": "Madhya Pradesh", "ujjain": "Madhya Pradesh", "pachmarhi": "Madhya Pradesh",
+    "amritsar": "Punjab", "guwahati": "Assam", "bhubaneswar": "Odisha", "raipur": "Chhattisgarh", "ranchi": "Jharkhand",
+    "visakhapatnam": "Andhra Pradesh", "vijayawada": "Andhra Pradesh", "tirupati": "Andhra Pradesh",
+    "dehradun": "Uttarakhand", "haridwar": "Uttarakhand", "rishikesh": "Uttarakhand", "srinagar": "Jammu and Kashmir",
+    "jammu": "Jammu and Kashmir", "shimla": "Himachal Pradesh", "manali": "Himachal Pradesh", "puducherry": "Puducherry",
+}
+
+# States where app-based, cost-shared carpool in private cars is permitted (sandbox policy table).
+# Maharashtra approved it in 2025. Legal must confirm before adding any state.
+CARPOOL_PERMITTED_STATES = {"Maharashtra"}
+
+# category, example car, seats, bags, ₹ per km, ₹ per extra hour (hourly rentals)
+CAR_TYPES = [
+    ("Hatchback", "WagonR or similar", 4, 2, 11, 120),
+    ("Sedan", "Swift Dzire or similar", 4, 3, 12, 150),
+    ("SUV", "Ertiga or similar", 6, 4, 15, 190),
+    ("Innova", "Toyota Innova Crysta or similar", 7, 5, 19, 240),
+    ("Tempo Traveller", "Force Traveller 12-seater", 12, 8, 26, 320),
+]
+LOCAL_OPERATORS = ["Shree Balaji Tours & Travels", "Sai Krupa Travels", "Royal Cabs & Tours",
+                   "Maa Durga Travels", "Om Sai Ram Tours", "Highway King Cabs"]
+HOURLY_PACKAGES = {4: 40, 8: 80, 12: 120}  # hours -> km included
+TRIP_TYPES = ("one_way", "round_trip", "local_hourly", "airport_transfer")
+DRIVER_ALLOWANCE_PER_DAY = 300
+MIN_KM_PER_DAY_ROUND_TRIP = 250
+CAR_CONVENIENCE_FEE = 49
+CARPOOL_FUEL_COST_PER_KM = 7  # ₹, used for the non-profit cost share
+CARPOOL_PLATFORM_FEE = 5
+
+
+def state_of(key: str) -> str | None:
+    return STATE_OF.get(key)
+
+
+def _parse_clock(raw: str | None, default: str = "09:00") -> int:
+    s = (raw or default).strip().lower()
+    m = re.match(r"^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$", s)
+    if not m:
+        raise ValueError("Give the pickup time as HH:MM (24h) or like '6 am'.")
+    h, mi, ap = int(m.group(1)), int(m.group(2) or 0), m.group(3)
+    if ap == "pm" and h < 12:
+        h += 12
+    if ap == "am" and h == 12:
+        h = 0
+    if not (0 <= h < 24 and 0 <= mi < 60):
+        raise ValueError("Pickup time is not a valid clock time.")
+    return h * 60 + mi
+
+
+def car_fare_breakdown(per_km: int, billable_km: int, road_km: int, days: int, pickup_min: int,
+                       trip_type: str, interstate: bool) -> dict:
+    """All-inclusive fare. Every rupee the customer pays is a line here; lines must add up to the total."""
+    base = billable_km * per_km
+    return_fee = int(road_km * per_km * 0.35) if trip_type == "one_way" and road_km > 80 else 0
+    tolls = 0 if trip_type in ("local_hourly", "airport_transfer") else (road_km // 60) * 85 * (2 if trip_type == "round_trip" else 1)
+    state_tax = 400 if interstate else 0
+    outstation = trip_type in ("one_way", "round_trip")
+    driver_allowance = DRIVER_ALLOWANCE_PER_DAY * days if outstation else 0
+    end_min = pickup_min + int(road_km / 50 * 60)
+    night = 250 if (pickup_min < 6 * 60 or pickup_min >= 22 * 60 or (outstation and end_min % (24 * 60) >= 22 * 60)) else 0
+    gst = round((base + return_fee) * 0.05)
+    lines = {"base_fare": base, "one_way_return_fee": return_fee, "tolls": tolls, "state_permit_tax": state_tax,
+             "driver_allowance": driver_allowance, "night_charge": night, "gst": gst}
+    lines = {k: v for k, v in lines.items() if v}
+    lines["total"] = sum(lines.values())
+    return lines
+
+
+def _check_breakdown(b: dict) -> None:
+    if sum(v for k, v in b.items() if k != "total") != b["total"]:
+        raise HarnessViolation("Fare breakdown does not add up to the total. Refusing to show a price.")
+
+
+def carpool_cost_share(km: int, car_seats_offered: int) -> int:
+    """Non-profit cost share per seat: fuel for the trip split across driver + riders."""
+    return max(10, -(-km * CARPOOL_FUEL_COST_PER_KM // (car_seats_offered + 1)))
+
+
+FIRST_NAMES_F = ["Priya", "Sneha", "Ananya", "Meera", "Kavya", "Pooja"]
+FIRST_NAMES_M = ["Rohit", "Amit", "Karan", "Vikram", "Sahil", "Nikhil"]
+POOL_CARS = ["Hyundai i20", "Maruti Baleno", "Tata Nexon", "Honda City", "Kia Seltos", "Maruti Swift"]
 
 # ---------------------------------------------------------------------------
 # Orders, payments, refunds (in-memory sandbox store)
@@ -480,6 +589,9 @@ class TravelEngine:
             else:
                 results = within
 
+        if _route_km(o.key, d.key) <= 400 or not (o.known and d.known):
+            notes.append("Door to door: a chauffeur-driven car from a verified local operator may suit this route "
+                         "(search_cars).")
         for r in results:
             r.option_id = f"OPT-{_h(r.mode, r.service, r.travel_class, r.date, str(r.travellers)) % 10**8:08d}"
             self.options[r.option_id] = r
@@ -493,6 +605,182 @@ class TravelEngine:
             "notes": notes, "data": "SANDBOX inventory: fares and seats are simulated",
         }
 
+    # -- cars ----------------------------------------------------------------
+    def search_cars(self, origin: str, destination: str | None, pickup_date: str, pickup_time: str = "09:00",
+                    travellers: int = 1, bags: int | None = None, trip_type: str = "one_way",
+                    return_date: str | None = None, hours: int | None = None) -> dict:
+        """Chauffeur-driven cars from verified local tours & travels operators (sandbox)."""
+        guard_text(origin, destination, pickup_date, pickup_time, trip_type, return_date)
+        if trip_type not in TRIP_TYPES:
+            raise ValueError(f"trip_type must be one of {', '.join(TRIP_TYPES)}.")
+        if not 1 <= travellers <= 12:
+            raise ValueError("Travellers must be between 1 and 12 for a car.")
+        bags = travellers if bags is None else bags
+        if not 0 <= bags <= 12:
+            raise ValueError("Bags must be between 0 and 12.")
+        o = resolve_place(origin)
+        day = parse_travel_date(pickup_date, self.today)
+        pick = _parse_clock(pickup_time)
+        notes: list[str] = []
+        days, interstate = 1, False
+
+        if trip_type == "local_hourly":
+            hours = hours or 8
+            if hours not in HOURLY_PACKAGES:
+                raise ValueError("Hourly packages are 4, 8 or 12 hours.")
+            d_name, road_km = o.name, HOURLY_PACKAGES[hours]
+            billable_km, dur = road_km, hours * 60
+            drop_point = f"Anywhere within {o.name} city limits"
+        elif trip_type == "airport_transfer":
+            if not o.airport_code:
+                raise ValueError(f"No airport in {o.name} in this sandbox. Use one_way to the nearest airport city.")
+            d_name, road_km = f"{o.name} airport", 25 + _h("apt", o.key) % 25
+            billable_km, dur = road_km, int(road_km / 30 * 60)
+            drop_point = f"{o.airport_name} ({o.airport_code})"
+        else:
+            if not destination:
+                raise ValueError("Tell me where the car should drop you.")
+            d = resolve_place(destination)
+            if d.key == o.key:
+                raise ValueError("Pickup and drop are in the same city: use local_hourly or airport_transfer.")
+            d_name, road_km = d.name, _route_km(o.key, d.key)
+            if road_km > 1500:
+                raise ValueError(f"{road_km} km is too far for a car trip in this sandbox. Try train or flight.")
+            so, sd = state_of(o.key), state_of(d.key)
+            interstate = bool(so and sd and so != sd)
+            drop_point = f"Your address in {d.name}"
+            dur = int(road_km / 50 * 60)
+            if trip_type == "round_trip":
+                if not return_date:
+                    raise ValueError("For a round trip, tell me the return date.")
+                back = parse_travel_date(return_date, self.today)
+                if back < day:
+                    raise ValueError("Return date is before the pickup date.")
+                days = (back - day).days + 1
+                billable_km = max(2 * road_km, MIN_KM_PER_DAY_ROUND_TRIP * days)
+                notes.append(f"Round trip: {days} day(s), {billable_km} km included "
+                             f"(minimum {MIN_KM_PER_DAY_ROUND_TRIP} km/day).")
+            else:
+                billable_km = road_km
+                days = 1 + dur // (14 * 60)
+
+        results: list[Option] = []
+        for cat, example, seats, cap_bags, per_km, extra_hr in CAR_TYPES:
+            if seats < travellers or cap_bags < bags:
+                continue
+            op = LOCAL_OPERATORS[_h("op", o.key, d_name, cat) % len(LOCAL_OPERATORS)]
+            b = car_fare_breakdown(per_km, billable_km, road_km, days, pick, trip_type, interstate)
+            _check_breakdown(b)
+            vehicle_total = b["total"]
+            rating = 4.2 + (_h("rt", op, cat) % 8) / 10
+            results.append(Option(
+                option_id="", mode="cab", operator=f"{op} (verified)", service=example, travel_class=cat,
+                origin=o.name, origin_point=f"Pickup from your address in {o.name}",
+                destination=d_name, destination_point=drop_point,
+                date=day.isoformat(), departs=_clock(pick), arrives=_clock(pick + dur), duration_minutes=dur,
+                fare_per_traveller=vehicle_total, convenience_fee=CAR_CONVENIENCE_FEE, travellers=travellers,
+                total_fare=vehicle_total + CAR_CONVENIENCE_FEE,
+                seats_left=1 + _h("cars", op, cat, day.isoformat()) % 4,
+                baggage=f"Up to {cap_bags} bags · {seats} seats",
+                cancellation_fee_before_24h=200 if seats <= 4 else 300,
+                cancellation_fee_within_24h=max(300, vehicle_total // 4),
+                refund_rule="Flat fee more than 24h before pickup; 25% of the car fare within 24h; convenience fee non-refundable",
+                priced_per="vehicle",
+                extras={
+                    "trip_type": trip_type, "seats": seats, "bags": cap_bags, "road_km": road_km,
+                    "km_included": billable_km, "extra_km_rate": per_km + 1, "extra_hour_rate": extra_hr,
+                    "days": days, "interstate": interstate, "price_breakdown": b,
+                    "inclusions": [k for k in b if k not in ("total", "base_fare", "gst")] + ["gst"],
+                    "no_cash_to_driver": True,
+                    "operator_checks": {
+                        "permit": "All India Tourist Permit" if trip_type in ("one_way", "round_trip") else "State contract carriage",
+                        "vehicle_age_max_years": 12, "insurance": True, "driver_police_verified": True},
+                    "operator_rating": round(rating, 1),
+                }))
+        if not results:
+            notes.append(f"No single car fits {travellers} travellers with {bags} bags. "
+                         "Book two cars, or a Tempo Traveller with fewer bags.")
+        for r in results:
+            r.option_id = f"CAR-{_h(r.mode, r.operator, r.travel_class, r.date, r.departs, r.destination, str(r.travellers), trip_type, str(days)) % 10**8:08d}"
+            self.options[r.option_id] = r
+        results.sort(key=lambda r: r.total_fare)
+        return {
+            "origin": o.name, "destination": d_name, "date": day.isoformat(), "pickup_time": _clock(pick),
+            "trip_type": trip_type, "travellers": travellers, "bags": bags,
+            "options": [r.summary() for r in results],
+            "cheapest_option_id": results[0].option_id if results else None,
+            "notes": notes + ["Prices are all-inclusive: tolls, state tax, driver allowance and night charges are "
+                              "already in the total. The customer pays nothing extra to the driver."],
+            "data": "SANDBOX inventory: operators, cars and fares are simulated",
+        }
+
+    def search_carpool(self, city: str, from_area: str, to_area: str, travel_date: str,
+                       depart_time: str = "09:00", seats: int = 1, community: str = "office",
+                       women_only: bool = False) -> dict:
+        """Cost-shared carpool for office / college commutes, only where state rules allow it."""
+        guard_text(city, from_area, to_area, travel_date, depart_time, community)
+        c = resolve_place(city)
+        for area in (from_area, to_area):
+            if not area or not re.match(r"^[A-Za-z][A-Za-z0-9 .'-]{1,40}$", area.strip()):
+                raise ValueError(f"'{area}' doesn't look like an area or landmark name.")
+        if from_area.strip().lower() == to_area.strip().lower():
+            raise ValueError("Pickup and drop areas are the same.")
+        if community not in ("office", "college", "public"):
+            raise ValueError("community must be office, college or public.")
+        if not 1 <= seats <= 3:
+            raise ValueError("A carpool booking is for 1 to 3 seats.")
+        day = parse_travel_date(travel_date, self.today)
+        want = _parse_clock(depart_time)
+        st = state_of(c.key)
+        if st not in CARPOOL_PERMITTED_STATES:
+            return {"available": False, "city": c.name, "state": st, "options": [],
+                    "notes": [f"Carpool in private cars isn't permitted on apps in {st or 'this state'} yet. "
+                              "We'll notify you when it is. A cab or bus may work instead."],
+                    "data": "SANDBOX policy table"}
+        fa, ta = from_area.strip().lower(), to_area.strip().lower()
+        km = 8 + _h("pool", c.key, fa, ta) % 22
+        verify = {"office": "Verified work email", "college": "Verified student ID", "public": "Paytm KYC verified"}[community]
+        results: list[Option] = []
+        for i, offset in enumerate((-15, 0, 10, 25)):
+            female = _h("g", c.key, fa, str(i)) % 2 == 0
+            if women_only and not female:
+                continue
+            name = (FIRST_NAMES_F if female else FIRST_NAMES_M)[(_h("n", fa) + i) % 6]  # distinct per ride
+            car = POOL_CARS[_h("pc", ta, str(i)) % len(POOL_CARS)]
+            offered = 2 + _h("so", str(i), fa) % 2
+            free = offered - _h("taken", str(i), day.isoformat()) % 2
+            if free < seats:
+                continue
+            share = carpool_cost_share(km, offered)
+            dep = want + offset
+            dur = int(km / 22 * 60) + 5
+            results.append(Option(
+                option_id="", mode="carpool", operator=f"{name} {chr(65 + _h('ini', name, str(i)) % 26)}. ({verify})",
+                service=f"{car} · {offered} seats offered", travel_class="Women-only" if women_only else "Shared",
+                origin=from_area.strip().title(), origin_point=f"{from_area.strip().title()}, {c.name}",
+                destination=to_area.strip().title(), destination_point=f"{to_area.strip().title()}, {c.name}",
+                date=day.isoformat(), departs=_clock(dep), arrives=_clock(dep + dur), duration_minutes=dur,
+                fare_per_traveller=share, convenience_fee=CARPOOL_PLATFORM_FEE, travellers=seats,
+                total_fare=share * seats + CARPOOL_PLATFORM_FEE, seats_left=free, baggage="Laptop bag",
+                cancellation_fee_before_24h=0, cancellation_fee_within_24h=share // 2,
+                refund_rule="Free cancellation until 24h before; half the share within 24h",
+                priced_per="traveller",
+                extras={"km": km, "community": community, "women_only": women_only,
+                        "driver_gender": "F" if female else "M",
+                        "cost_share_rule": f"₹{CARPOOL_FUEL_COST_PER_KM}/km fuel × {km} km ÷ ({offered} seats + driver), non-profit",
+                        "max_share_allowed": carpool_cost_share(km, offered), "state": st,
+                        "safety": ["Live trip sharing", "SOS", "Verified co-riders"]}))
+        for r in results:
+            r.option_id = f"POOL-{_h(r.operator, r.departs, r.date, str(r.travellers), str(women_only)) % 10**8:08d}"
+            self.options[r.option_id] = r
+        results.sort(key=lambda r: abs(_parse_clock(r.departs) - want))
+        return {"available": True, "city": c.name, "state": st, "from": from_area.strip().title(),
+                "to": to_area.strip().title(), "date": day.isoformat(),
+                "options": [r.summary() for r in results],
+                "notes": ([] if results else ["No matching rides yet. Post your route and we'll match you."]) +
+                         ["Price is a computed fuel cost share. Drivers can't charge more (non-profit carpool)."],
+                "data": "SANDBOX carpool rides"}
+
     def _option(self, option_id: str) -> Option:
         opt = self.options.get(option_id)
         if not opt:
@@ -504,7 +792,10 @@ class TravelEngine:
         return {"option_id": option_id, "baggage": o.baggage, "refund_rule": o.refund_rule,
                 "cancellation_fee_per_traveller_before_24h": o.cancellation_fee_before_24h,
                 "cancellation_fee_per_traveller_within_24h": o.cancellation_fee_within_24h,
-                "convenience_fee_non_refundable": o.convenience_fee}
+                "convenience_fee_non_refundable": o.convenience_fee, "priced_per": o.priced_per,
+                **({"price_breakdown": o.extras["price_breakdown"], "km_included": o.extras["km_included"],
+                    "extra_km_rate": o.extras["extra_km_rate"], "no_cash_to_driver": True} if o.mode == "cab" else {}),
+                **({"cost_share_rule": o.extras["cost_share_rule"]} if o.mode == "carpool" else {})}
 
     # -- booking ---------------------------------------------------------------
     def hold(self, option_id: str, passenger_name: str, customer_confirmed: bool, confirmation_text: str) -> dict:
@@ -515,6 +806,10 @@ class TravelEngine:
         opt = self._option(option_id)
         if opt.seats_left <= 0:
             raise ValueError("No seats left on this option. Pick another.")
+        if opt.mode == "carpool" and opt.fare_per_traveller > opt.extras.get("max_share_allowed", 0):
+            raise HarnessViolation("Blocked: carpool price is above the non-profit cost share.")
+        if opt.mode == "cab":
+            _check_breakdown(opt.extras["price_breakdown"])
         # Idempotent: same option + passenger while a hold is live -> same order
         for od in self.orders.values():
             if od.option.option_id == option_id and od.passenger_name.lower() == passenger_name.strip().lower() \
@@ -601,8 +896,10 @@ class TravelEngine:
             fee, rule = paid - o.convenience_fee, "Departure has passed: no refund"
         else:
             per = o.cancellation_fee_before_24h if hours >= 24 else o.cancellation_fee_within_24h
-            fee = min(paid - o.convenience_fee, per * o.travellers)
-            rule = f"{'More than' if hours >= 24 else 'Within'} 24h of departure: ₹{per:,} × {o.travellers}"
+            units = 1 if o.priced_per == "vehicle" else o.travellers
+            fee = min(paid - o.convenience_fee, per * units)
+            unit_txt = "per vehicle" if o.priced_per == "vehicle" else f"× {o.travellers}"
+            rule = f"{'More than' if hours >= 24 else 'Within'} 24h of departure: ₹{per:,} {unit_txt}"
         return {"order_id": order_id, "paid": paid, "cancellation_fee": fee,
                 "convenience_fee_non_refundable": o.convenience_fee,
                 "refund_amount": max(0, paid - fee - o.convenience_fee),

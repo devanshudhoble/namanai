@@ -167,7 +167,11 @@ export class ContextEngineeringHarness {
       this.facts.push({
         kind: 'option',
         id: o.id,
-        amounts: [o.price, o.baseFare, o.taxesAndFees, o.convenienceFee, o.cancellation.feeBefore24h, o.cancellation.feeWithin24h],
+        amounts: [
+          o.price, o.baseFare, o.taxesAndFees, o.convenienceFee, o.cancellation.feeBefore24h, o.cancellation.feeWithin24h,
+          // Price lines inside the option's own fare text (car inclusions, carpool cost share) are tool output too
+          ...Array.from(`${o.baggage.checkIn} ${o.cancellation.refundSummary}`.matchAll(/₹\s?([\d,]+)/g)).map((m) => Number(m[1].replace(/,/g, ''))),
+        ],
         codes: [o.serviceNumber],
         summary: `${o.mode}|${o.provider}|${o.serviceNumber}|dep ${o.departureTime}|${o.duration}|₹${o.price}`,
         tool: 'search_transport_options',

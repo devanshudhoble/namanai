@@ -349,6 +349,13 @@ function resolveCityInfo(name: string): CityTransitInfo {
   };
 }
 
+/** Car categories offered by verified local tours & travels operators (sandbox; mirrors mcp_server CAR_TYPES). */
+const CAR_TYPES = [
+  { key: 'sedan', category: 'Sedan', example: 'Swift Dzire or similar', seats: 4, bags: 3, perKm: 12, base: 3600, operator: 'Sai Krupa Travels' },
+  { key: 'suv', category: 'SUV', example: 'Ertiga or similar', seats: 6, bags: 4, perKm: 15, base: 4500, operator: 'Shree Balaji Tours & Travels' },
+  { key: 'innova', category: 'Innova', example: 'Innova Crysta or similar', seats: 7, bags: 5, perKm: 19, base: 5700, operator: 'Royal Cabs & Tours' },
+];
+
 class TravelEngineService {
   private currentOptions: TravelOption[] = [];
   private activeHolds: Map<string, BookingHold> = new Map();
@@ -649,6 +656,94 @@ class TravelEngineService {
         tradeOffDescription: `Reclining plush seats with live GPS tracking and female-safe travel guarantee.`,
       },
 
+      // 9-11. CHAUFFEUR-DRIVEN CARS from verified local tours & travels operators (all-inclusive)
+      ...CAR_TYPES.filter((c) => c.seats >= pCount).map((c, i): TravelOption => {
+        const tolls = 340;
+        const driverAllowance = 300;
+        const gst = Math.round(c.base * 0.05);
+        const total = c.base + tolls + driverAllowance + gst;
+        return {
+          id: `opt-cab-${c.key}-${Date.now()}-${9 + i}`,
+          mode: 'cab',
+          provider: `${c.operator} (verified)`,
+          operator: c.operator,
+          serviceNumber: `${c.category} · ${c.example}`,
+          origin: origin,
+          originCode: `${oInfo.code}-CAR`,
+          originTerminal: `Pickup from your address in ${origin}`,
+          destination: destination,
+          destCode: `${dInfo.code}-CAR`,
+          destTerminal: `Your address in ${destination}`,
+          departureTime: '06:00 AM (Pickup)',
+          arrivalTime: '11:30 AM',
+          duration: '5h 30m (Door to door)',
+          price: total + 49,
+          baseFare: c.base,
+          taxesAndFees: tolls + driverAllowance + gst,
+          convenienceFee: 49,
+          seatsAvailable: 1 + i,
+          baggage: {
+            cabin: `${c.seats} seats · up to ${c.bags} bags`,
+            checkIn: `tolls ₹${tolls}, driver allowance ₹${driverAllowance} and GST are included, 300 km included, then ₹${c.perKm + 1} per km`,
+          },
+          cancellation: {
+            refundable: true,
+            refundSummary: `Flat ₹${c.seats <= 4 ? 200 : 300} fee more than 24h before pickup; 25% within 24h`,
+            feeBefore24h: c.seats <= 4 ? 200 : 300,
+            feeWithin24h: Math.max(300, Math.round(total / 4)),
+            penaltyClause: 'Fee is per car, not per traveller. Convenience fee non-refundable.',
+          },
+          convenienceScore: 86 - i * 3,
+          isRecommended: false,
+          recommendationTag: `${c.category} · all-inclusive · no cash to driver`,
+          tradeOffDescription: `Door-to-door ${c.category} from a permit-checked local operator. Fits ${c.seats} people and ${c.bags} bags.`,
+        };
+      }),
+
+      // 12-13. OFFICE / COLLEGE CARPOOL (non-profit fuel cost share, verified co-riders)
+      ...[
+        { driver: 'Priya S.', car: 'Hyundai i20', time: '08:45 AM', km: 14, offered: 3 },
+        { driver: 'Rohit K.', car: 'Tata Nexon', time: '09:00 AM', km: 14, offered: 2 },
+      ].map((p, i): TravelOption => {
+        const share = Math.ceil((p.km * 7) / (p.offered + 1));
+        return {
+          id: `opt-carpool-${Date.now()}-${12 + i}`,
+          mode: 'carpool',
+          provider: `${p.driver} (verified work email)`,
+          operator: 'Paytm Carpool',
+          serviceNumber: `${p.car} · ${p.offered} seats offered`,
+          origin: origin,
+          originCode: `${oInfo.code}-POOL`,
+          originTerminal: `${origin} pickup point`,
+          destination: destination,
+          destCode: `${dInfo.code}-POOL`,
+          destTerminal: `${destination} drop point`,
+          departureTime: p.time,
+          arrivalTime: i === 0 ? '09:30 AM' : '09:45 AM',
+          duration: '45m (Shared)',
+          price: share * pCount + 5,
+          baseFare: share * pCount,
+          taxesAndFees: 0,
+          convenienceFee: 5,
+          seatsAvailable: p.offered,
+          baggage: {
+            cabin: 'Laptop bag',
+            checkIn: `₹7 per km fuel × ${p.km} km split across ${p.offered + 1} people, so the driver makes no profit`,
+          },
+          cancellation: {
+            refundable: true,
+            refundSummary: 'Free cancellation until 24h before; half the share within 24h',
+            feeBefore24h: 0,
+            feeWithin24h: Math.floor(share / 2),
+            penaltyClause: 'Live trip sharing and SOS on every ride.',
+          },
+          convenienceScore: 80 - i * 4,
+          isRecommended: i === 0,
+          recommendationTag: i === 0 ? 'Carpool · women driver · verified' : 'Carpool · verified colleague',
+          tradeOffDescription: 'Cost-shared commute with verified colleagues. Available only where state rules allow carpool.',
+        };
+      }),
+
       // 8. DESTINATION HOTEL
       {
         id: `opt-hotel-${Date.now()}-8`,
@@ -712,6 +807,9 @@ class TravelEngineService {
     if (mode && mode !== 'all') {
       const modeLower = mode.toLowerCase();
       sourcePool = sourcePool.filter((opt) => opt.mode.toLowerCase() === modeLower);
+    } else {
+      // Cars and carpool are door-to-door / commute products: show them only when asked for
+      sourcePool = sourcePool.filter((opt) => opt.mode !== 'cab' && opt.mode !== 'carpool');
     }
 
     // Filter by budget only if explicitly provided
@@ -753,7 +851,7 @@ class TravelEngineService {
 
     const orderId = `ORD-VOY-${Math.floor(100000 + Math.random() * 900000)}`;
     const randomSuffix = Math.random().toString(36).substring(2, 6).toUpperCase();
-    const pnrPrefix = option.mode === 'flight' ? '6E' : option.mode === 'train' ? 'IRCTC' : 'BUS';
+    const pnrPrefix = option.mode === 'flight' ? '6E' : option.mode === 'train' ? 'IRCTC' : option.mode === 'cab' ? 'CAR' : option.mode === 'carpool' ? 'POOL' : 'BUS';
     const pnr = `${pnrPrefix}-${Math.floor(1000 + Math.random() * 9000)}-${randomSuffix}`;
     const holdExpiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes hold
 

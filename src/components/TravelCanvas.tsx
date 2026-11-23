@@ -26,6 +26,7 @@ import {
   Share2,
   ExternalLink,
   Compass,
+  Car,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -69,7 +70,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
   auditTrail,
 }) => {
   const [timeLeft, setTimeLeft] = useState<number>(600);
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flight' | 'train' | 'bus' | 'hotel'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'flight' | 'train' | 'bus' | 'hotel' | 'cab' | 'carpool'>('all');
 
   useEffect(() => {
     if (!hold || hold.status !== 'held') return;
@@ -401,6 +402,26 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
               >
                 🏨 Hotels
               </button>
+              {options.some((o) => o.mode === 'cab') && (
+                <button
+                  onClick={() => setSelectedCategory('cab')}
+                  className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                    selectedCategory === 'cab' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🚗 Cars
+                </button>
+              )}
+              {options.some((o) => o.mode === 'carpool') && (
+                <button
+                  onClick={() => setSelectedCategory('carpool')}
+                  className={`px-2 py-1 rounded-lg transition cursor-pointer ${
+                    selectedCategory === 'carpool' ? 'bg-white text-blue-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  🤝 Carpool
+                </button>
+              )}
             </div>
           </div>
 
@@ -412,6 +433,7 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
                 const isFlight = opt.mode === 'flight';
                 const isTrain = opt.mode === 'train';
                 const isHotel = opt.mode === 'hotel';
+                const isCar = opt.mode === 'cab' || opt.mode === 'carpool';
 
                 return (
                   <div
@@ -434,6 +456,8 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
                               ? 'bg-amber-100 text-amber-800'
                               : isHotel
                               ? 'bg-purple-100 text-purple-700'
+                              : isCar
+                              ? 'bg-orange-100 text-orange-800'
                               : 'bg-emerald-100 text-emerald-800'
                           }`}
                         >
@@ -443,6 +467,8 @@ export const TravelCanvas: React.FC<TravelCanvasProps> = ({
                             <Train className="w-4 h-4" />
                           ) : isHotel ? (
                             <Hotel className="w-4 h-4" />
+                          ) : isCar ? (
+                            <Car className="w-4 h-4" />
                           ) : (
                             <Bus className="w-4 h-4" />
                           )}

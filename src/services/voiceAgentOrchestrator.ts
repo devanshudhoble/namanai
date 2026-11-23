@@ -43,7 +43,7 @@ export interface AgentContext {
   date: string; // display
   dateISO: string | null;
   passengersCount: number;
-  modePreference: 'flight' | 'train' | 'bus' | 'hotel' | 'all' | null;
+  modePreference: 'flight' | 'train' | 'bus' | 'hotel' | 'cab' | 'carpool' | 'all' | null;
   selectedClass: string | null;
   timePreference: string | null;
   budget: number | null;
@@ -473,6 +473,11 @@ export class VoiceAgentOrchestrator {
     const text =
       `${lead} ${label(opt)}, departing ${opt.departureTime}, ${opt.duration.split(' (')[0]}. ` +
       `Total for ${pax} traveller${pax > 1 ? 's' : ''} is ${inr(opt.price)}, one-way on ${c.date}. ` +
+      (opt.mode === 'cab'
+        ? `This is all-inclusive: ${opt.baggage.checkIn}. You pay nothing extra to the driver. `
+        : opt.mode === 'carpool'
+        ? `This is a fuel cost share, not a fare: ${opt.baggage.checkIn}. `
+        : '') +
       `Cancellation: ${opt.cancellation.refundSummary.toLowerCase()}. Shall I book it?`;
     this.reply(text, 'SOLICIT_EXPLICIT_APPROVAL', t0, voice);
   }
@@ -503,7 +508,7 @@ export class VoiceAgentOrchestrator {
       phone: '+91 9XXXX XXXXX',
       email: 'traveller@example.com',
       upiId: handle,
-      seatPreference: option.mode === 'train' ? 'Lower berth (preference)' : option.mode === 'bus' ? 'Single sleeper (preference)' : 'Window (preference)',
+      seatPreference: option.mode === 'train' ? 'Lower berth (preference)' : option.mode === 'bus' ? 'Single sleeper (preference)' : option.mode === 'cab' ? 'Pickup at your address' : option.mode === 'carpool' ? 'Pickup at your area' : 'Window (preference)',
     };
     c.step = 'seat_locked';
     this.emit();
@@ -687,7 +692,7 @@ export class VoiceAgentOrchestrator {
     }
     const text = intent === 'ask_baggage'
       ? `${opt.provider} ${opt.serviceNumber}: cabin ${opt.baggage.cabin.toLowerCase()}, check-in ${opt.baggage.checkIn.toLowerCase()}.`
-      : `${opt.provider} ${opt.serviceNumber}: ${opt.cancellation.refundSummary}. Fee is ${inr(opt.cancellation.feeBefore24h)} per traveller more than 24 hours before departure, ${inr(opt.cancellation.feeWithin24h)} within 24 hours. The ${inr(opt.convenienceFee)} convenience fee isn't refundable.`;
+      : `${opt.provider} ${opt.serviceNumber}: ${opt.cancellation.refundSummary}. Fee is ${inr(opt.cancellation.feeBefore24h)} ${opt.mode === 'cab' ? 'per car' : 'per traveller'} more than 24 hours before departure, ${inr(opt.cancellation.feeWithin24h)} within 24 hours. The ${inr(opt.convenienceFee)} convenience fee isn't refundable.`;
     return this.reply(text, intent === 'ask_baggage' ? 'BAGGAGE_POLICY' : 'CANCELLATION_POLICY', t0, voice, {
       name: 'get_fare_rules',
       params: { optionId: opt.id },

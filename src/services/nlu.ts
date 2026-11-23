@@ -32,7 +32,7 @@ export const INTENTS: Intent[] = [
   'payment_failed', 'shift_date', 'booking_status', 'greeting', 'other',
 ];
 
-export type ModePref = 'flight' | 'train' | 'bus' | 'hotel' | 'all';
+export type ModePref = 'flight' | 'train' | 'bus' | 'hotel' | 'cab' | 'carpool' | 'all';
 
 export interface ExtractedSlots {
   destination?: string;
@@ -50,7 +50,7 @@ export interface ExtractedSlots {
 export interface Understanding {
   intent: Intent;
   slots: ExtractedSlots;
-  selection?: { mode?: 'flight' | 'train' | 'bus' | 'hotel'; index?: number };
+  selection?: { mode?: Exclude<ModePref, 'all'>; index?: number };
   dateShiftDays?: number;
   /** Optional free text from the LLM for small talk. Must pass the grounding validator before being spoken. */
   reply?: string;
@@ -94,7 +94,7 @@ export const KNOWN_LOCATIONS = [
 ];
 
 const NOT_A_CITY = new Set([
-  'yes', 'no', 'hi', 'hello', 'namaste', 'ok', 'okay', 'train', 'bus', 'flight', 'hotel', 'haan', 'nahi', 'sure',
+  'yes', 'no', 'hi', 'hello', 'namaste', 'ok', 'okay', 'train', 'bus', 'flight', 'hotel', 'cab', 'taxi', 'car', 'gaadi', 'carpool', 'haan', 'nahi', 'sure',
   'thanks', 'thank', 'please', 'book', 'cancel', 'one', 'two', 'return', 'oneway', 'today', 'tomorrow', 'kal',
   'parso', 'me', 'i', 'want', 'to', 'go', 'the', 'a', 'travel', 'trip', 'ticket', 'help', 'morning', 'evening',
   'cheaper', 'fastest', 'sasta', 'select', 'option', 'what', 'my', 'is', 'from', 'se', 'jana', 'hai',
@@ -141,6 +141,12 @@ function isDestMarked(lower: string, hit: CityHit): boolean {
   return /\b(to|for|towards|reach|visit)\s*$/.test(before) || /^\s+(tak|jana|jaana|ke liye|pahunchna)\b/.test(after);
 }
 
+/** Keep only place-like words: drop trailing mode/time words ("Hinjewadi carpool" -> "Hinjewadi"). */
+function cleanPlace(raw: string): string | undefined {
+  const words = raw.split(/\s+/).filter((w) => !NOT_A_CITY.has(w.toLowerCase()) && !/^(subah|shaam|raat|carpool|cab|gaadi|taxi|car|chahiye|kal|aaj)$/i.test(w));
+  return words.length ? words.join(' ') : undefined;
+}
+
 export function extractCities(text: string, activeQuestion?: string): { origin?: string; destination?: string } {
   const lower = text.toLowerCase();
   const hits = findKnownCities(lower);
@@ -156,7 +162,12 @@ export function extractCities(text: string, activeQuestion?: string): { origin?:
   if (hits.length === 1) {
     const h = hits[0];
     const city = normalizeCity(h.city);
-    if (isOriginMarked(lower, h)) return { origin: city };
+    if (isOriginMarked(lower, h)) {
+      // "Pune se Mahabaleshwar": a known origin followed by an unknown town or locality
+      const after = text.match(new RegExp(`\\b${h.city}\\s+se\\s+([A-Za-z]{3,}(?:\\s[A-Za-z]{3,})?)`, 'i'));
+      const dest = after ? cleanPlace(after[1]) : undefined;
+      return dest ? { origin: city, destination: normalizeCity(dest) } : { origin: city };
+    }
     if (isDestMarked(lower, h)) return { destination: city };
     return activeQuestion === 'origin' ? { origin: city } : { destination: city };
   }
@@ -166,6 +177,12 @@ export function extractCities(text: string, activeQuestion?: string): { origin?:
   const fromM = text.match(/\bfrom\s+([A-Za-z]{3,})/i) || text.match(/\b([A-Za-z]{3,})\s+se\b/i);
   const out: { origin?: string; destination?: string } = {};
   if (toM && !NOT_A_CITY.has(toM[1].toLowerCase().split(' ')[0])) out.destination = normalizeCity(toM[1]);
+  // Hinglish "Wakad se Hinjewadi": the word after "se" is the destination (localities, towns, villages)
+  const seTo = text.match(/\b[A-Za-z]{3,}\s+se\s+([A-Za-z]{3,}(?:\s[A-Za-z]{3,})?)/i);
+  if (!out.destination && seTo) {
+    const dest = cleanPlace(seTo[1]);
+    if (dest) out.destination = normalizeCity(dest);
+  }
   if (fromM && !NOT_A_CITY.has(fromM[1].toLowerCase())) out.origin = normalizeCity(fromM[1]);
   if (out.origin || out.destination) return out;
 
@@ -326,6 +343,8 @@ export function extractMode(lower: string): ModePref | undefined {
   if (/\b(flight|flights|plane|fly|hawai|airline|indigo|akasa|air india)\b/.test(lower)) return 'flight';
   if (/\b(train|trains|railway|irctc|rail|3ac|2ac|1ac|3 ac|2 ac|chair car|vande bharat)\b/.test(lower)) return 'train';
   if (/\b(bus|buses|volvo|sleeper bus)\b/.test(lower)) return 'bus';
+  if (/\b(carpool|car pool|car-pool|pooling|ride share|share ride|sharing car|office pool)\b/.test(lower)) return 'carpool';
+  if (/\b(cab|cabs|taxi|car|gaadi|gadi|innova|ertiga|suv|sedan|outstation|chauffeur|tempo traveller)\b/.test(lower)) return 'cab';
   if (/\b(hotel|hotels|stay|resort)\b/.test(lower)) return 'hotel';
   if (/\b(anything|any mode|all options|sab|kuch bhi|whatever is cheapest)\b/.test(lower)) return 'all';
   return undefined;
@@ -377,7 +396,7 @@ export function rulesUnderstand(text: string, state: DialogueState): Understandi
   if (/(payment (failed|declined|didn't go|did not go|nahi hua)|transaction failed|declined|failed on)/.test(lower)) {
     return u('payment_failed');
   }
-  if (/\bcancel\b/.test(lower) && /\b(booking|ticket|flight|train|bus|trip|my)\b/.test(lower) && state.hasConfirmedBooking) {
+  if (/\bcancel\b/.test(lower) && /\b(booking|ticket|flight|train|bus|cab|car|carpool|trip|my)\b/.test(lower) && state.hasConfirmedBooking) {
     return u('cancel_booking');
   }
   if (/(baggage|luggage|check-in|checkin|cabin bag|\bkg\b)/.test(lower)) return u('ask_baggage');

@@ -19,7 +19,7 @@ from mcp.types import ToolAnnotations
 
 from .travel_core import HarnessViolation, TravelEngine, list_known_places
 
-INSTRUCTIONS = """You are connected to a SANDBOX travel booking system for India (flights, trains, buses).
+INSTRUCTIONS = """You are connected to a SANDBOX travel booking system for India (flights, trains, buses, chauffeur-driven cars, carpool).
 Follow these rules. The server also enforces them, so breaking them only produces errors:
 1. Resolve dates to YYYY-MM-DD before calling search_trips. Any Indian city, town or village is allowed.
 2. Only quote prices, PNRs, order ids and refund amounts that a tool returned. Never estimate them.
@@ -27,14 +27,17 @@ Follow these rules. The server also enforces them, so breaking them only produce
    Call hold_fare only after the customer says yes, passing their exact words as confirmation_text.
 4. Never ask for, accept or repeat a UPI PIN, OTP, CVV or card number. Payment is approved on the UPI screen.
 5. If money was debited but there is no ticket, call reconcile_payment. Don't guess the outcome.
-6. Before cancel_booking, call quote_refund and tell the customer the exact refund. Cancel only after a yes."""
+6. Before cancel_booking, call quote_refund and tell the customer the exact refund. Cancel only after a yes.
+7. Cars (search_cars): say the ALL-INCLUSIVE total, what it includes, km included and the extra-km rate.
+   Tell the customer they pay nothing extra to the driver. Never quote a lower "base" price on its own.
+8. Carpool (search_carpool): only where available=true. The price is a cost share; never negotiate it."""
 
 mcp = MCPServer(
     name="voyai-naman-travel",
     title="VoyAI Naman travel booking (sandbox)",
-    description="Search and book Indian flights, trains and buses with consent, credential and grounding guardrails.",
+    description="Search and book Indian flights, trains, buses, cars and carpool with consent, credential and grounding guardrails.",
     instructions=INSTRUCTIONS,
-    version="1.0.0",
+    version="1.1.0",
 )
 engine = TravelEngine()
 
@@ -72,6 +75,52 @@ def search_trips(origin: str, destination: str, travel_date: str, travellers: in
     (e.g. a town has no airport). All prices are server-side sandbox values.
     """
     return _safe(engine.search, origin, destination, travel_date, travellers, mode, max_total_budget, time_of_day)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_cars(origin: str, pickup_date: str, destination: str | None = None, pickup_time: str = "09:00",
+                travellers: int = 1, bags: int | None = None, trip_type: str = "one_way",
+                return_date: str | None = None, hours: int | None = None) -> dict:
+    """Chauffeur-driven cars from verified local tours & travels operators anywhere in India.
+
+    Args:
+        origin: Pickup city, town or village (e.g. "Pune", "Nagpur").
+        pickup_date: YYYY-MM-DD, or "today" / "tomorrow".
+        destination: Drop city for one_way / round_trip. Not needed for local_hourly or airport_transfer.
+        pickup_time: "HH:MM" 24h, or like "6 am".
+        travellers: 1-12. Only cars with enough seats are returned.
+        bags: Number of bags (default = travellers). Only cars with enough boot space are returned.
+        trip_type: "one_way", "round_trip", "local_hourly" or "airport_transfer".
+        return_date: Required for round_trip.
+        hours: 4, 8 or 12 for local_hourly.
+
+    Returns cars sorted by total. Each total is ALL-INCLUSIVE (tolls, state tax, driver allowance, night charge, GST)
+    with a price_breakdown that adds up to it, km_included and extra_km_rate. Read these back before hold_fare.
+    The same hold_fare / request_upi_payment / quote_refund / cancel_booking tools book and cancel a car.
+    """
+    return _safe(engine.search_cars, origin, destination, pickup_date, pickup_time, travellers, bags,
+                 trip_type, return_date, hours)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_carpool(city: str, from_area: str, to_area: str, travel_date: str, depart_time: str = "09:00",
+                   seats: int = 1, community: str = "office", women_only: bool = False) -> dict:
+    """Cost-shared carpool for office or college commutes inside a city.
+
+    Args:
+        city: City (e.g. "Pune").
+        from_area: Pickup area or landmark (e.g. "Wakad").
+        to_area: Drop area or landmark (e.g. "Hinjewadi Phase 1").
+        travel_date: YYYY-MM-DD, or "today" / "tomorrow".
+        depart_time: "HH:MM" or like "9 am".
+        seats: 1-3.
+        community: "office" (verified work email), "college" (verified student ID) or "public" (Paytm KYC).
+        women_only: Only women drivers and co-riders.
+
+    Available only in states whose rules allow app-based carpool in private cars; elsewhere returns
+    available=false. The price is a computed non-profit fuel cost share, never set by the driver.
+    """
+    return _safe(engine.search_carpool, city, from_area, to_area, travel_date, depart_time, seats, community, women_only)
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -145,7 +194,9 @@ def cancel_booking(order_id: str, customer_confirmed: bool, confirmation_text: s
 def guardrails() -> str:
     return "# Booking guardrails\n\n" + INSTRUCTIONS + (
         "\n\nEnforced in code: credential guard on every text argument, consent gate on hold and cancel, "
-        "server-side prices only, idempotent holds and payment retries, deterministic sandbox inventory."
+        "server-side prices only, idempotent holds and payment retries, deterministic sandbox inventory, "
+        "car fare breakdowns that must add up to the total, carpool prices capped at the non-profit cost share, "
+        "carpool only in states that permit it."
     )
 
 

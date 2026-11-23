@@ -36,7 +36,7 @@ INTENTS = [
     "give_name", "ask_baggage", "ask_cancellation_policy", "cancel_booking", "payment_issue",
     "payment_failed", "shift_date", "booking_status", "greeting", "other",
 ]
-MODES = ["flight", "train", "bus", "hotel", "all"]
+MODES = ["flight", "train", "bus", "hotel", "cab", "carpool", "all"]
 
 RESPONSE_SCHEMA: Dict[str, Any] = {
     "type": "OBJECT",
@@ -60,7 +60,7 @@ RESPONSE_SCHEMA: Dict[str, Any] = {
         "selection": {
             "type": "OBJECT",
             "properties": {
-                "mode": {"type": "STRING", "enum": ["flight", "train", "bus", "hotel"]},
+                "mode": {"type": "STRING", "enum": ["flight", "train", "bus", "hotel", "cab", "carpool"]},
                 "index": {"type": "INTEGER", "description": "1-based option number the user referred to"},
             },
         },
@@ -122,7 +122,7 @@ def clean_understanding(raw: Dict[str, Any], today: date) -> Dict[str, Any]:
     result: Dict[str, Any] = {"intent": intent, "slots": out}
     sel = raw.get("selection") or {}
     selection: Dict[str, Any] = {}
-    if sel.get("mode") in ("flight", "train", "bus", "hotel"):
+    if sel.get("mode") in ("flight", "train", "bus", "hotel", "cab", "carpool"):
         selection["mode"] = sel["mode"]
     if isinstance(sel.get("index"), int) and 1 <= sel["index"] <= 10:
         selection["index"] = sel["index"]

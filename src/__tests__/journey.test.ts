@@ -106,3 +106,27 @@ describe('Guardrails', () => {
     expect(a.lastAgent()).toMatch(/never share your UPI PIN/);
   });
 });
+
+describe('Cars and carpool journey', () => {
+  it('books an outstation car from one Hinglish sentence with an all-inclusive read-back', async () => {
+    const a = agent();
+    const c = await a.say('Pune se Mahabaleshwar kal subah, 4 log, gaadi chahiye');
+    expect(c.options.length).toBeGreaterThan(0);
+    expect(c.options.every((o) => o.mode === 'cab')).toBe(true);
+    expect(c.options.every((o) => o.baggage.cabin.startsWith('4') || parseInt(o.baggage.cabin, 10) >= 4)).toBe(true);
+    await a.say('sabse sasta');
+    expect(a.ctx.waitingForApproval).toBe(true);
+    expect(a.lastAgent()).toMatch(/all-inclusive/);
+    expect(a.lastAgent()).toMatch(/nothing extra to the driver/);
+  });
+
+  it('shows carpool only when asked, and never in an all-modes search', async () => {
+    const a = agent();
+    const c = await a.say('Mumbai se Pune kal 2 log');
+    expect(c.options.some((o) => o.mode === 'cab' || o.mode === 'carpool')).toBe(false);
+    const b = agent();
+    const d = await b.say('Kal Wakad se Hinjewadi carpool, 1 seat');
+    expect(d.options.length).toBeGreaterThan(0);
+    expect(d.options.every((o) => o.mode === 'carpool')).toBe(true);
+  });
+});

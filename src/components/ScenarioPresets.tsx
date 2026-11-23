@@ -7,6 +7,8 @@ import {
   TrendingUp,
   CreditCard,
   RefreshCw,
+  Car,
+  Users,
 } from 'lucide-react';
 
 interface ScenarioPresetsProps {
@@ -67,6 +69,22 @@ export const ScenarioPresets: React.FC<ScenarioPresetsProps> = ({
       prompt: 'I want to cancel my booking. How much refund will I get?',
       icon: RefreshCw,
       color: 'bg-purple-50/60 hover:bg-purple-50 border-purple-200 text-purple-700',
+    },
+    {
+      id: 'sc-7',
+      title: 'Outstation car (new)',
+      subtitle: 'Local operator, all-inclusive, no cash to driver',
+      prompt: 'Pune se Mahabaleshwar kal subah, 4 log, gaadi chahiye',
+      icon: Car,
+      color: 'bg-amber-50/60 hover:bg-amber-50 border-amber-200 text-amber-800',
+    },
+    {
+      id: 'sc-8',
+      title: 'Office carpool (new)',
+      subtitle: 'Verified colleagues, non-profit cost share',
+      prompt: 'Kal Wakad se Hinjewadi carpool, 1 seat',
+      icon: Users,
+      color: 'bg-emerald-50/60 hover:bg-emerald-50 border-emerald-200 text-emerald-800',
     },
   ];
 

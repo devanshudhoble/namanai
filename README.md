@@ -1,6 +1,6 @@
 # VoyAI Naman: a voice booking agent for Indian travel
 
-> **Branch `mcp_feature`:** everything on `main` **plus an MCP booking server**. The same booking tools and guardrails are exposed through the Model Context Protocol, so any agent (Claude Desktop, WhatsApp, voice) can search and book across India safely. Jump to [MCP booking server](#mcp-booking-server).
+> **Branch `car_rental-feature`:** everything on `mcp_feature` and the APM research pack, **plus cars (outstation, rental, airport) from local operators and office/college carpool**, bookable by voice and through MCP. Branch `mcp_feature`: everything on `main` **plus an MCP booking server**. The same booking tools and guardrails are exposed through the Model Context Protocol, so any agent (Claude Desktop, WhatsApp, voice) can search and book across India safely. Jump to [MCP booking server](#mcp-booking-server).
 
 **Say the whole trip in one sentence, in Hinglish, and book it safely.**
 *"Mumbai se Nagpur agle Friday, 2 log, train"* → options in one turn → explicit "yes" → UPI → ticket. Failed payments, "money deducted but no ticket" and cancellations are handled in the same conversation.
@@ -28,10 +28,11 @@ A working prototype plus a product case study, built around one idea: **with mon
 | 2 | **Context engineering harness** | Credential guard, PII redaction, token-budgeted layered context, schema output + server validation, deterministic overrides, slot ledger, grounding validator, offline fallback | `src/services/contextHarness.ts`, `backend/routes/agent.py` |
 | 3 | **Gemini + Sarvam** | Gemini 2.5 Flash for understanding (server-side key); Sarvam Bulbul for Indian-voice TTS | `backend/routes/` |
 | 4 | **Journey analytics** | Real event funnel, drop-off, turns-to-options, latency p50/p90, guardrail counts | Insights panel, `src/services/analytics.ts` |
-| 5 | **MCP booking server** *(this branch)* | 9 tools, 2 resources and 1 prompt; any Indian city, town or village; harness enforced in code | `mcp_server/`, [docs/MCP.md](docs/MCP.md) |
-| 6 | **Tests & eval** | 22 frontend + 5 backend + 16 MCP tests; 30-utterance Hinglish NLU eval | `src/__tests__`, `backend/tests`, `mcp_server/tests` |
+| 5 | **MCP booking server** *(this branch)* | 11 tools (incl. cars and carpool), 2 resources and 1 prompt; any Indian city, town or village; harness enforced in code | `mcp_server/`, [docs/MCP.md](docs/MCP.md) |
+| 6 | **Tests & eval** | 24 frontend + 5 backend + 30 MCP tests; 30-utterance Hinglish NLU eval | `src/__tests__`, `backend/tests`, `mcp_server/tests` |
 | 7 | **Product strategy memo** | 15-page PDF: personas, GTM, product design, execution, PR/FAQ, KPI tree, pre-mortem | [PDF](docs/Paytm_Travel_Voice_Agent_Case_Study.pdf) |
 | 8 | **Walkthrough video** | 2-minute captioned demo | [MP4](docs/demo/voyai_walkthrough.mp4) |
+| 10 | **Cars and carpool** *(branch `car_rental-feature`)* | Outstation one-way / round trip, hourly rental and airport transfer from verified local tours & travels operators, with all-inclusive fares (tolls, state tax, driver allowance in the total; no cash to driver). Office/college carpool with a non-profit cost share, women-only option, live only in states that permit it. Voice: "Pune se Mahabaleshwar kal subah, 4 log, gaadi chahiye" | MCP `search_cars`, `search_carpool`; web app car mode; [research](docs/research/07_cars_cabs_carpool_research.md), [PRD](docs/research/08_cars_prd.md) |
 | 9 | **APM research pack** | Sourced market research (India vs global labelled), competitor analysis, journey map + funnel, payment and cancellation taxonomy, proto-personas + interview plan, AI opportunity matrix + RICE, master spreadsheet, wireframes, presentation deck | [docs/research/](docs/research/README.md) |
 
 ---

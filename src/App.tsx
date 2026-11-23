@@ -151,7 +151,7 @@ export function App() {
               Aapka Travel AI Concierge — Bol ke book karo
             </h2>
             <p className="text-xs text-blue-100 font-medium max-w-xl">
-              Flight, train, bus ya hotel: ek line mein boliye. Agent sirf missing details poochega, fare dikhayega, aapki haan ke baad hi UPI se book karega.
+              Flight, train, bus, gaadi, carpool ya hotel: ek line mein boliye. Agent sirf missing details poochega, fare dikhayega, aapki haan ke baad hi UPI se book karega.
             </p>
           </div>
 
