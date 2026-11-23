@@ -25,6 +25,24 @@ import { contextHarness, type JourneyStage, type SlotKey } from './contextHarnes
 import { analytics } from './analytics';
 import { llmUnderstand } from './agentApi';
 import {
+  parseCabRequest,
+  parseCabSupport,
+  airport as cabAirport,
+  rentals as cabRentals,
+  trips as cabTrips,
+  share as cabShare,
+  setFlightDelay,
+  trackFlight,
+  addMinutes,
+  to12h,
+  backupFor,
+  resetCabsState,
+  defaultTripDate,
+  HOME_CITY,
+  type CabRequest,
+  type CabSearchResult,
+} from './cabsEngine';
+import {
   rulesUnderstand,
   countSlots,
   formatDisplayDate,
@@ -61,6 +79,9 @@ export interface AgentContext {
   activeQuestion: ActiveQuestion;
   nluSource: 'llm' | 'rules' | null;
   isThinking: boolean;
+  /** Paytm Cabs: the last cab search (product, flight, insights) and any pending question. */
+  cab: (Omit<CabSearchResult, 'options'> & { request: CabRequest; backupProvider?: string; driver?: string }) | null;
+  cabPending: CabRequest | null;
 }
 
 const WELCOME = 'Namaste! Where would you like to travel? You can say it all at once, like "Mumbai to Nagpur next Friday, 2 people, train".';
@@ -102,6 +123,7 @@ export class VoiceAgentOrchestrator {
   private context: AgentContext;
   private onStateChange: (ctx: AgentContext) => void;
   private isProcessing = false;
+  private lastText = '';
 
   constructor(onStateChange: (ctx: AgentContext) => void) {
     this.onStateChange = onStateChange;
@@ -134,6 +156,8 @@ export class VoiceAgentOrchestrator {
       activeQuestion: 'destination',
       nluSource: null,
       isThinking: false,
+      cab: null,
+      cabPending: null,
       messages: [{ id: 'msg-welcome', role: 'agent', text: WELCOME, timestamp: new Date().toLocaleTimeString(), isSpoken: true }],
     };
   }
@@ -150,6 +174,7 @@ export class VoiceAgentOrchestrator {
     speechService.stopSpeaking();
     speechService.stopListening();
     travelEngine.resetInventory();
+    resetCabsState();
     contextHarness.reset();
     analytics.newSession();
     this.context = this.initialContext();
@@ -242,6 +267,7 @@ export class VoiceAgentOrchestrator {
     }
 
     this.append({ id: `user-${Date.now()}`, role: 'user', text, timestamp: new Date().toLocaleTimeString() });
+    this.lastText = text;
     this.context.isThinking = true;
     this.emit();
 
@@ -298,6 +324,20 @@ export class VoiceAgentOrchestrator {
     if (u.intent === 'give_name' && u.slots.passengerName) {
       c.passengerName = u.slots.passengerName;
       return this.lockAndRequestPayment(t0, voice);
+    }
+
+    // ---- Paytm Cabs: post-booking cab support ("flight late hai", "driver nahi aaya") ----
+    const support = parseCabSupport(this.lastText);
+    if (support && c.hold?.selectedOption.cab && (c.hold.status === 'paid' || c.hold.status === 'reconciled')) {
+      return support.kind === 'no_show' ? this.cabNoShow(t0, voice) : this.cabFlightDelay(support.minutes, t0, voice);
+    }
+    // ---- Paytm Cabs: a new cab request (Airport · Rentals · Trips · Share) ----
+    const pickingFromCabs = c.options.some((o) => o.cab) && !c.hold && ['select_option', 'ask_cheaper', 'ask_fastest', 'ask_morning'].includes(u.intent);
+    const cabReq = pickingFromCabs ? null : parseCabRequest(this.lastText);
+    if (cabReq) return this.cabSearch(cabReq, u, t0, voice);
+    if (c.cabPending && (u.slots.destination || u.slots.origin)) {
+      const pending = { ...c.cabPending, to: u.slots.destination ?? c.cabPending.to, from: u.slots.origin ?? c.cabPending.from };
+      return this.cabSearch(pending, u, t0, voice);
     }
 
     // Apply slots to the ledger (single source of truth) and mirror into UI context
@@ -470,6 +510,25 @@ export class VoiceAgentOrchestrator {
     c.activeQuestion = 'approval';
     analytics.track('option_selected', { mode: opt.mode, price: opt.price });
     const pax = c.passengersCount || 1;
+    if (opt.cab) {
+      const m = opt.cab;
+      const what = m.product === 'airport' ? `${m.flightNumber ? `linked to flight ${m.flightNumber}, ` : ''}pickup ${opt.departureTime} at ${m.pickupLabel}`
+        : m.product === 'rental' ? `${m.hours} hours / ${m.kmIncluded} km from ${opt.departureTime}`
+        : m.product === 'trip' ? `${m.days && m.days > 1 ? `${m.days}-day round trip` : 'one-way'}, pickup ${opt.departureTime} on ${c.date}`
+        : `shared seat, leaves ${opt.departureTime}`;
+      const cabText =
+        `${lead} ${label(opt)}: ${what}. Total ${inr(opt.price)}, all-inclusive: ${opt.baggage.checkIn}. ` +
+        (m.shared ? (m.costShareRule ? `It's a fuel cost share (${m.costShareRule}). ` : 'Licensed cab, fixed route. ') : 'You pay nothing extra to the driver. ') +
+        `${m.permitNote ? `${m.permitNote}. ` : ''}Paytm Assured: backup cab or refund if the driver doesn't come. ` +
+        `Cancellation: ${opt.cancellation.refundSummary.toLowerCase()}. Shall I book it?`;
+      this.reply(cabText, 'SOLICIT_EXPLICIT_APPROVAL', t0, voice, {
+        name: 'get_quote',
+        params: { quoteId: opt.quoteId ?? '' },
+        resultSummary: `Quote ${opt.quoteId} · all-in ${inr(opt.price)}`,
+        durationMs: 0,
+      });
+      return;
+    }
     const text =
       `${lead} ${label(opt)}, departing ${opt.departureTime}, ${opt.duration.split(' (')[0]}. ` +
       `Total for ${pax} traveller${pax > 1 ? 's' : ''} is ${inr(opt.price)}, one-way on ${c.date}. ` +
@@ -501,6 +560,10 @@ export class VoiceAgentOrchestrator {
     const c = this.context;
     const option = c.selectedOption;
     if (!option) return this.askNextOrSearch([], t0, voice);
+    if (option.cab && !option.quoteId) {
+      analytics.track('guardrail_no_quote_id');
+      return this.reply('I can only book a cab fare that has a live quote. Let me fetch fresh quotes first.', 'BLOCKED_NO_QUOTE', t0, voice);
+    }
     const handle = `${c.passengerName.toLowerCase().replace(/[^a-z]/g, '') || 'traveller'}@paytm`;
     const passenger: PassengerDetails = {
       id: `usr-${Date.now()}`,
@@ -553,8 +616,15 @@ export class VoiceAgentOrchestrator {
     contextHarness.recordHold(c.hold);
     contextHarness.recordPayment(txn);
     analytics.track('booking_confirmed', { amount: c.hold.amount, mode: c.hold.selectedOption.mode });
+    const cm = c.hold.selectedOption.cab;
+    if (cm && c.cab) c.cab = { ...c.cab, driver: cm.shared ? 'Seat confirmed' : 'Manju · KA 05 AB 1234 · number masked' };
+    const cabLine = cm
+      ? cm.shared
+        ? ` Your seat is confirmed, leaving ${c.hold.selectedOption.departureTime} from ${cm.pickupLabel}. Live trip sharing and SOS are on.`
+        : ` Driver Manju, ${c.hold.selectedOption.serviceNumber.split(' · ')[0]}, KA 05 AB 1234, will be at ${cm.pickupLabel} at ${c.hold.selectedOption.departureTime}. Calls are masked; live share and SOS are on.${cm.flightNumber ? ` I'm tracking ${cm.flightNumber}: if it's late, the pickup moves at no charge.` : ''}`
+      : ' The e-ticket is in My Trips.';
     this.reply(
-      `Payment received. Your booking is confirmed, PNR ${c.hold.pnr}. The e-ticket is in My Trips. Have a great journey, ${c.passengerName}!`,
+      `Payment received. Your booking is confirmed, PNR ${c.hold.pnr}.${cabLine} Have a great journey, ${c.passengerName}!`,
       'BOOKING_CONFIRMED',
       performance.now(),
       true,
@@ -719,6 +789,120 @@ export class VoiceAgentOrchestrator {
   // ---------------------------------------------------------------------------
   // Output: grounding validator + TTS
   // ---------------------------------------------------------------------------
+  // ---------------------------------------------------------------------------
+  // Paytm Cabs (Airport · Rentals · Trips · Share)
+  // ---------------------------------------------------------------------------
+  private async cabSearch(req: CabRequest, u: Understanding, t0: number, voice: boolean) {
+    const c = this.context;
+    // A finished booking stays in My Trips; a new cab request starts a fresh booking
+    if (c.hold) {
+      c.hold = null;
+      c.transaction = null;
+      c.refund = null;
+      c.refundQuote = null;
+      c.auditTrail = [];
+    }
+    const pax = u.slots.passengers ?? (req.product === 'airport' || req.product === 'share' ? 1 : 2);
+    const dateISO = u.slots.dateISO ?? defaultTripDate();
+    let destination = req.to ?? u.slots.destination;
+    const origin = req.from ?? u.slots.origin ?? HOME_CITY;
+    if (req.product === 'trip' && !destination) {
+      c.cabPending = req;
+      c.activeQuestion = 'destination';
+      c.modePreference = 'cab';
+      return this.reply('Sure. Where should the cab take you, and for how many days?', 'CAB_ASK_DESTINATION', t0, voice);
+    }
+    c.cabPending = null;
+    c.step = 'discovering';
+    this.emit();
+    const tTool = performance.now();
+    await new Promise((r) => setTimeout(r, 250));
+    const res =
+      req.product === 'airport' ? cabAirport(req, pax)
+      : req.product === 'rental' ? cabRentals(req, pax)
+      : req.product === 'share' ? cabShare(req, pax)
+      : cabTrips(req, pax, origin, destination!);
+    const toolMs = performance.now() - tTool;
+    analytics.timing('tool_ms', toolMs);
+    analytics.track('cab_search', { product: res.product, options: res.options.length });
+
+    const first = res.options[0];
+    destination = first?.cab?.dropLabel ?? destination ?? '';
+    contextHarness.setSlot('origin', first?.cab?.pickupLabel ?? origin, u.source);
+    contextHarness.setSlot('destination', destination, u.source);
+    contextHarness.setSlot('dateISO', dateISO, u.source);
+    contextHarness.setSlot('passengers', pax, u.source);
+    contextHarness.setSlot('mode', res.product === 'share' ? 'carpool' : 'cab', u.source);
+    this.syncFromLedger();
+
+    travelEngine.registerOptions(res.options);
+    c.options = res.options;
+    c.selectedOption = null;
+    c.step = 'options_presented';
+    c.activeQuestion = 'options';
+    c.cab = { product: res.product, headline: res.headline, notes: res.notes, flight: res.flight, leaveBy: res.leaveBy, blockedByCityRules: res.blockedByCityRules, request: req };
+    contextHarness.recordOptions(res.options);
+    analytics.track('options_shown', { count: res.options.length });
+    if (!res.options.length) {
+      return this.reply(`${res.headline} I couldn't find a cab that fits. Want me to try a bigger car or another time?`, 'CAB_NO_OPTIONS', t0, voice);
+    }
+    const ask = res.product === 'airport' ? 'Book it?' : 'Which one should I book?';
+    return this.reply(`${res.headline} ${ask}`, `CAB_OPTIONS_${res.product.toUpperCase()}`, t0, voice, {
+      name: res.product === 'airport' ? 'track_flight + search_rides' : 'search_rides + recommend',
+      params: { product: res.product, passengers: pax, date: dateISO, ...(req.flightNumber ? { flight: req.flightNumber } : {}), ...(req.hours ? { hours: req.hours } : {}), ...(req.days ? { days: req.days } : {}) },
+      resultSummary: `${res.options.length} quotes, AI ranked (sandbox)`,
+      durationMs: Math.round(toolMs),
+    });
+  }
+
+  /** Acceptance criterion: flight delayed 15+ min -> pickup moves, user told, no charge. */
+  private cabFlightDelay(minutes: number, t0: number, voice: boolean) {
+    const c = this.context;
+    const hold = c.hold!;
+    const m = hold.selectedOption.cab!;
+    if (m.product !== 'airport' || !m.flightNumber) {
+      return this.reply("This booking isn't linked to a flight. If your plans changed, tell me the new pickup time.", 'CAB_NOT_FLIGHT_LINKED', t0, voice);
+    }
+    setFlightDelay(m.flightNumber, minutes);
+    const f = trackFlight(m.flightNumber);
+    if (minutes < 15) {
+      return this.reply(`${m.flightNumber} is running ${minutes} min late. Your driver waits for you, no change and no charge.`, 'CAB_FLIGHT_SMALL_DELAY', t0, voice);
+    }
+    const newPickup = f.kind === 'arrival' ? addMinutes(f.actualTime, 20) : m.pickupTime;
+    const opt = { ...hold.selectedOption, departureTime: to12h(newPickup), cab: { ...m, pickupTime: newPickup, flightStatus: f.status } };
+    c.hold = { ...hold, selectedOption: opt };
+    if (c.cab) c.cab = { ...c.cab, flight: f };
+    analytics.track('cab_pickup_rescheduled', { delayMin: minutes });
+    c.auditTrail = [...c.auditTrail, `[${new Date().toLocaleTimeString()}] ${m.flightNumber} delayed ${minutes} min: pickup moved to ${to12h(newPickup)}, no charge`];
+    return this.reply(
+      `${m.flightNumber} is now ${f.status}, landing ${to12h(f.actualTime)}. I've moved your pickup to ${to12h(newPickup)} and told the driver. No charge for the change.`,
+      'CAB_PICKUP_RESCHEDULED', t0, voice,
+      { name: 'track_flight', params: { flight: m.flightNumber }, resultSummary: `${f.status}; pickup ${to12h(newPickup)}`, durationMs: 120 }
+    );
+  }
+
+  /** Acceptance criterion: driver not there 10 min after ETA -> backup in 5 min, or refund + credit. */
+  private cabNoShow(t0: number, voice: boolean) {
+    const c = this.context;
+    const hold = c.hold!;
+    const m = hold.selectedOption.cab!;
+    const backup = backupFor(hold.selectedOption);
+    analytics.track('cab_no_show', { provider: m.providerKey });
+    if (!backup) {
+      c.hold = { ...hold, status: 'refunded' };
+      return this.reply('Sorry, no backup cab is free right now. I have started a full refund to your UPI, plus a travel credit for the trouble.', 'CAB_NO_SHOW_REFUND', t0, voice);
+    }
+    const opt = { ...hold.selectedOption, provider: `${backup.name} (backup)`, operator: backup.name };
+    c.hold = { ...hold, selectedOption: opt };
+    if (c.cab) c.cab = { ...c.cab, backupProvider: backup.name, driver: 'Backup driver Imran · KA 03 MN 4410 · number masked' };
+    c.auditTrail = [...c.auditTrail, `[${new Date().toLocaleTimeString()}] Driver no-show reported: backup from ${backup.name}, same fare`];
+    return this.reply(
+      `Sorry about that. A backup cab from ${backup.name} (${backup.onTimePct}% on time) is on the way and reaches you in 5 minutes, at the same ${inr(hold.amount)}. If it doesn't arrive, you get a full refund plus a travel credit, automatically.`,
+      'CAB_NO_SHOW_BACKUP', t0, voice,
+      { name: 'reassign_backup', params: { orderId: hold.orderId }, resultSummary: `Backup: ${backup.name}`, durationMs: 180 }
+    );
+  }
+
   private reply(text: string, intent: string, t0: number, voice: boolean, toolCall?: Message['toolCall']) {
     const check = contextHarness.validateReply(text);
     let spoken = text;

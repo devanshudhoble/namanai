@@ -18,6 +18,7 @@ from mcp.server import MCPServer
 from mcp.types import ToolAnnotations
 
 from .travel_core import HarnessViolation, TravelEngine, list_known_places
+from .cabs import CabsService
 
 INSTRUCTIONS = """You are connected to a SANDBOX travel booking system for India (flights, trains, buses, chauffeur-driven cars, carpool).
 Follow these rules. The server also enforces them, so breaking them only produces errors:
@@ -30,16 +31,20 @@ Follow these rules. The server also enforces them, so breaking them only produce
 6. Before cancel_booking, call quote_refund and tell the customer the exact refund. Cancel only after a yes.
 7. Cars (search_cars): say the ALL-INCLUSIVE total, what it includes, km included and the extra-km rate.
    Tell the customer they pay nothing extra to the driver. Never quote a lower "base" price on its own.
-8. Carpool (search_carpool): only where available=true. The price is a cost share; never negotiate it."""
+8. Carpool (search_carpool): only where available=true. The price is a cost share; never negotiate it.
+9. Paytm Cabs (search_rides -> recommend/compare -> get_quote -> confirm): airport cabs are linked to the rider's
+   flight (track_flight). Quote only quote ids the server returned; confirm needs the rider's own yes.
+   If a flight is late call report_flight_delay; if the driver doesn't come call report_no_show."""
 
 mcp = MCPServer(
     name="voyai-naman-travel",
     title="VoyAI Naman travel booking (sandbox)",
     description="Search and book Indian flights, trains, buses, cars and carpool with consent, credential and grounding guardrails.",
     instructions=INSTRUCTIONS,
-    version="1.1.0",
+    version="1.2.0",
 )
 engine = TravelEngine()
+cabs = CabsService(engine)
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
@@ -186,6 +191,62 @@ def cancel_booking(order_id: str, customer_confirmed: bool, confirmation_text: s
     """Cancel a confirmed booking and start the refund. Only after quoting the refund and
     getting the customer's yes, passing their exact words as confirmation_text."""
     return _safe(engine.cancel, order_id, customer_confirmed, confirmation_text)
+
+
+# ------------------------------------------------------------------ Paytm Cabs (case study tool contract)
+@mcp.tool(annotations=READ_ONLY)
+def track_flight(flight_number: str) -> dict:
+    """Live status of a flight the rider booked on Paytm (e.g. "6E 2134"). Airport cabs follow the real landing time."""
+    return _safe(cabs.track_flight, flight_number)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_rides(product: str, pickup_date: str, travellers: int = 1, flight_number: str | None = None,
+                 hours: int | None = None, planned_km: int | None = None, destination: str | None = None,
+                 days: int = 1, bags: int | None = None, from_area: str | None = None, to_area: str | None = None,
+                 city: str = "Bengaluru", women_only: bool = False) -> dict:
+    """Paytm Cabs quotes, AI-ranked. product: "airport" (needs flight_number), "rental" (hours 4/8/12, planned_km),
+    "trip" (destination, days) or "share" (from_area, to_area, city; the city rules engine decides carpool).
+    Every quote has a quote_id and an all-in price_breakdown that adds up to the total."""
+    return _safe(cabs.search_rides, product, pickup_date, travellers, flight_number, hours, planned_km, destination,
+                 days, bags, from_area, to_area, city, women_only)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def recommend(quote_ids: list[str], travellers: int, bags: int, budget: int | None = None, elderly: bool = False,
+              women_only: bool = False, ghats: bool = False) -> dict:
+    """Rank quotes: price vs budget 30%, fits people and bags 25%, reliability 25%, rating and safety 20%. Returns a 'why' per quote."""
+    return _safe(cabs.recommend, quote_ids, travellers, bags, budget, elderly, women_only, ghats)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def compare(quote_ids: list[str]) -> dict:
+    """Side-by-side: provider, car, base, AI all-in, on-time %, tag (Best value / Most reliable)."""
+    return _safe(cabs.compare, quote_ids)
+
+
+@mcp.tool(annotations=READ_ONLY)
+def get_quote(quote_id: str) -> dict:
+    """Full all-in breakdown for a quote. Read this back to the rider before confirm."""
+    return _safe(cabs.get_quote, quote_id)
+
+
+@mcp.tool(annotations=WRITE)
+def confirm(quote_id: str, rider_name: str, customer_confirmed: bool, confirmation_text: str) -> dict:
+    """Book a cab quote. Needs a live quote_id and the rider's own confirming words. Then call request_upi_payment."""
+    return _safe(cabs.confirm, quote_id, rider_name, customer_confirmed, confirmation_text)
+
+
+@mcp.tool(annotations=WRITE)
+def report_flight_delay(order_id: str, flight_number: str, delay_minutes: int) -> dict:
+    """Flight delayed 15+ min: the pickup moves to the new landing time, at no charge."""
+    return _safe(cabs.report_flight_delay, order_id, flight_number, delay_minutes)
+
+
+@mcp.tool(annotations=WRITE)
+def report_no_show(order_id: str) -> dict:
+    """Driver not there: assign a backup cab (5 min ETA) at the same fare; if that fails, full refund plus credit."""
+    return _safe(cabs.report_no_show, order_id)
 
 
 # ------------------------------------------------------------------ resources

@@ -35,6 +35,10 @@ export type EventName =
   | 'credential_blocked'
   | 'ungrounded_claim_blocked'
   | 'session_abandoned'
+  | 'cab_search'
+  | 'cab_pickup_rescheduled'
+  | 'cab_no_show'
+  | 'guardrail_no_quote_id'
   | 'timing';
 
 export interface AnalyticsEvent {

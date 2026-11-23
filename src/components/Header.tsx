@@ -32,7 +32,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <p className="text-xs text-slate-500 font-medium">
-              Flights • Trains • Buses • Cars • Carpool • UPI
+              Flights • Trains • Buses • Cabs • UPI
             </p>
           </div>
         </div>

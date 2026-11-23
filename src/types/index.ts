@@ -42,6 +42,44 @@ export interface TravelOption {
   tradeOffDescription: string;
   isSpiked?: boolean;
   originalPrice?: number;
+  /** Cabs: every bookable cab fare has a quote id from the cabs engine (no quote id, no fare). */
+  quoteId?: string;
+  cab?: CabMeta;
+}
+
+export type CabProduct = 'airport' | 'rental' | 'trip' | 'share';
+
+export interface CabMeta {
+  product: CabProduct;
+  quoteId: string;
+  providerKey: string;
+  pickupLabel: string;
+  dropLabel: string;
+  pickupTime: string; // HH:MM 24h
+  rideMinutes: number;
+  onTimePct: number;
+  cancelPct: number;
+  rating: number;
+  womenDriver: boolean;
+  ev: boolean;
+  seats: number;
+  bags: number;
+  lines: { label: string; amount: number }[];
+  allIn: number;
+  score?: number;
+  why?: string[];
+  flightNumber?: string;
+  flightStatus?: string;
+  hours?: number;
+  days?: number;
+  kmIncluded?: number;
+  plannedKm?: number;
+  extraKmRate?: number;
+  extraHourRate?: number;
+  permitNote?: string;
+  shared?: boolean;
+  splitCars?: boolean;
+  costShareRule?: string;
 }
 
 export type AgentStateStep =

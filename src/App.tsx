@@ -5,6 +5,8 @@ import { ConversationalFeed } from './components/ConversationalFeed';
 import { TravelCanvas } from './components/TravelCanvas';
 import { AnalyticsDrawer } from './components/AnalyticsDrawer';
 import { ScenarioPresets } from './components/ScenarioPresets';
+import { CabsTab } from './components/CabsTab';
+import { CabsInsights } from './components/CabsInsights';
 import { VoiceAgentOrchestrator, AgentContext } from './services/voiceAgentOrchestrator';
 import { speechService } from './services/speechService';
 import type { UpiFailureReason } from './services/paymentEngine';
@@ -151,7 +153,7 @@ export function App() {
               Aapka Travel AI Concierge — Bol ke book karo
             </h2>
             <p className="text-xs text-blue-100 font-medium max-w-xl">
-              Flight, train, bus, gaadi, carpool ya hotel: ek line mein boliye. Agent sirf missing details poochega, fare dikhayega, aapki haan ke baad hi UPI se book karega.
+              Flight, train, bus, cab (airport, rental, trip, share) ya hotel: ek line mein boliye. Agent sirf missing details poochega, fare dikhayega, aapki haan ke baad hi UPI se book karega.
             </p>
           </div>
 
@@ -188,6 +190,8 @@ export function App() {
           </div>
         </div>
 
+        <CabsTab onSend={handleSendMessage} isProcessing={context.isThinking} />
+
         <ScenarioPresets onTriggerScenario={handleTriggerScenario} isProcessing={context.isThinking} />
 
         {/* 2-Column Responsive Workspace */}
@@ -214,6 +218,15 @@ export function App() {
 
           {/* Right Column: Interactive Multi-Modal Travel Canvas */}
           <div className="lg:col-span-7">
+            {context.cab && (context.options.some((o) => o.cab) || context.hold?.selectedOption.cab) && (
+              <CabsInsights
+                cab={context.cab}
+                options={context.options}
+                hold={context.hold}
+                onSelect={handleSelectOption}
+                onSend={handleSendMessage}
+              />
+            )}
             <TravelCanvas
               options={context.options}
               selectedOption={context.selectedOption}

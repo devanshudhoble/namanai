@@ -872,6 +872,11 @@ class TravelEngineService {
     return hold;
   }
 
+  /** Cab quotes come from the cabs engine; register them so the same hold / UPI / refund flow works. */
+  public registerOptions(options: TravelOption[]): void {
+    this.currentOptions = options;
+  }
+
   public triggerPriceSpike(optionId: string, newPrice: number = 8600): TravelOption | null {
     const idx = this.currentOptions.findIndex((o) => o.id === optionId);
     if (idx !== -1) {
